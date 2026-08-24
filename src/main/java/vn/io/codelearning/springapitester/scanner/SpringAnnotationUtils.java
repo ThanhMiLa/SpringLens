@@ -1,14 +1,14 @@
 package vn.io.codelearning.springapitester.scanner;
 
-import com.intellij.codeInsight.AnnotationUtil;
 import com.intellij.psi.*;
 import vn.io.codelearning.springapitester.model.HttpMethodEnum;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
+/**S
  * Tiện ích bóc tách dữ liệu từ các Annotation của Spring Boot và Java Security.
  */
 public final class SpringAnnotationUtils {
@@ -40,8 +40,8 @@ public final class SpringAnnotationUtils {
         if (psiClass == null || psiClass.isInterface() || psiClass.isAnnotationType()) {
             return false;
         }
-        return AnnotationUtil.isAnnotated(psiClass, REST_CONTROLLER_FQN, AnnotationUtil.CHECK_HIERARCHY) ||
-               AnnotationUtil.isAnnotated(psiClass, CONTROLLER_FQN, AnnotationUtil.CHECK_HIERARCHY);
+        return hasAnnotationRecursively(psiClass, REST_CONTROLLER_FQN, new HashSet<>()) ||
+               hasAnnotationRecursively(psiClass, CONTROLLER_FQN, new HashSet<>());
     }
 
     /**
@@ -52,11 +52,42 @@ public final class SpringAnnotationUtils {
      */
     public static boolean isRestController(PsiClass psiClass) {
         if (psiClass == null) return false;
-        if (AnnotationUtil.isAnnotated(psiClass, REST_CONTROLLER_FQN, AnnotationUtil.CHECK_HIERARCHY)) {
+        if (hasAnnotationRecursively(psiClass, REST_CONTROLLER_FQN, new HashSet<>())) {
             return true;
         }
-        return AnnotationUtil.isAnnotated(psiClass, CONTROLLER_FQN, AnnotationUtil.CHECK_HIERARCHY) &&
+        return hasAnnotationRecursively(psiClass, CONTROLLER_FQN, new HashSet<>()) &&
                psiClass.hasAnnotation(RESPONSE_BODY_FQN);
+    }
+
+    /**
+     * Kiểm tra đệ quy xem một class có chứa annotation (kể cả thông qua meta-annotation) hay không.
+     */
+    private static boolean hasAnnotationRecursively(PsiClass psiClass, String annotationFqn, Set<String> visited) {
+        if (psiClass == null || visited.contains(psiClass.getQualifiedName())) {
+            return false;
+        }
+        visited.add(psiClass.getQualifiedName());
+
+        if (psiClass.hasAnnotation(annotationFqn)) {
+            return true;
+        }
+
+        // Kiểm tra các annotation trên class này (meta-annotations)
+        for (PsiAnnotation annotation : psiClass.getAnnotations()) {
+            String qName = annotation.getQualifiedName();
+            if (qName != null && !qName.startsWith("java.lang.annotation")) {
+                PsiJavaCodeReferenceElement nameReferenceElement = annotation.getNameReferenceElement();
+                if (nameReferenceElement != null) {
+                    PsiElement resolved = nameReferenceElement.resolve();
+                    if (resolved instanceof PsiClass metaClass && metaClass.isAnnotationType()) {
+                        if (hasAnnotationRecursively(metaClass, annotationFqn, visited)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
