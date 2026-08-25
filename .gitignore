@@ -1,6 +1,47 @@
-.DS_Store
-.gradle
+# ==========================================
+# IntelliJ IDEA & IDE Artifacts
+# ==========================================
 .idea
-.intellijPlatform
-.kotlin
-build
+*.iml
+*.iws
+*.ipr
+out/
+
+# ==========================================
+# Gradle & Build Artifacts
+# ==========================================
+.gradle/
+build/
+.kotlin/
+.intellijPlatform/
+
+# ==========================================
+# Java / JVM Logs & Dumps
+# ==========================================
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# ==========================================
+# OS Generated Files (macOS, Windows)
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# ==========================================
+# Environment & Secrets / Signing Keys
+# ==========================================
+.env
+local.properties
+*.key
+*.pem
+*.jks
+*.keystore
+*.p12
+*.crt
