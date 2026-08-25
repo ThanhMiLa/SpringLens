@@ -16,5 +16,9 @@
 
     <!-- Tạm thời để trống. Chúng ta sẽ thêm class Java vào đây sau -->
     <extensions defaultExtensionNs="com.intellij">
-    </extensions>
+    <toolWindow id="SpringLens"
+                anchor="right"
+                factoryClass="vn.io.codelearning.springapitester.ui.SpringLensToolWindowFactory"
+                icon="AllIcons.Nodes.WebFolder"/>
+  </extensions>
 </idea-plugin>
