@@ -1,6 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 
-rootProject.name = "spring-api-tester"
+rootProject.name = "SpringLens"
 
 pluginManagement {
     plugins {
