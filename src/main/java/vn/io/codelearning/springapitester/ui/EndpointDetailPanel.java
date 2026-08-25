@@ -27,6 +27,7 @@ public class EndpointDetailPanel extends JPanel {
     private final JButton sendBtn;
 
     private final ParamTablePanel paramPanel;
+    private ParamTablePanel formDataPanel;
     private final HeaderTablePanel headerPanel;
     private final AuthPanel authPanel;
     private Editor requestBodyEditor;
@@ -34,6 +35,10 @@ public class EndpointDetailPanel extends JPanel {
     
     private final JPanel requestBodyPanel;
     private final JPanel responseBodyPanel;
+    private JPanel bodyCards;
+    private JRadioButton jsonRadio;
+    private JRadioButton formRadio;
+    private JButton syncBtn;
     
     private final JBLabel statusLabel;
     private final JTextArea responseHeadersArea;
@@ -68,21 +73,65 @@ public class EndpointDetailPanel extends JPanel {
         
         // --- 2.1 Request Tabs ---
         JBTabbedPane requestTabs = new JBTabbedPane();
-        paramPanel = new ParamTablePanel();
+        paramPanel = new ParamTablePanel(java.util.List.of(
+            vn.io.codelearning.springapitester.model.ParamTypeEnum.PATH_VARIABLE,
+            vn.io.codelearning.springapitester.model.ParamTypeEnum.QUERY_PARAM
+        ));
         headerPanel = new HeaderTablePanel();
         authPanel = new AuthPanel();
         
         // Request Body with Toolbar
         requestBodyPanel = new JPanel(new BorderLayout());
         JPanel bodyToolbar = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        
+        // Body Type Switcher
+        JRadioButton jsonRadio = new JRadioButton("JSON");
+        JRadioButton formRadio = new JRadioButton("Form-Data");
+        ButtonGroup bodyTypeGroup = new ButtonGroup();
+        bodyTypeGroup.add(jsonRadio);
+        bodyTypeGroup.add(formRadio);
+        jsonRadio.setSelected(true); // default
+        
+        bodyToolbar.add(new JLabel("Type: "));
+        bodyToolbar.add(jsonRadio);
+        bodyToolbar.add(formRadio);
+        
         JButton syncBtn = new JButton("🔄 Sync Schema");
         syncBtn.addActionListener(e -> onSyncSchemaClicked());
         bodyToolbar.add(syncBtn);
         requestBodyPanel.add(bodyToolbar, BorderLayout.NORTH);
         
-        // Initialize Request Editor (Always JSON for now)
+        // Editors / Panels for Body
+        JPanel bodyCards = new JPanel(new CardLayout());
         requestBodyEditor = CodeEditorUtil.createEditor(project, "", "json", false);
-        requestBodyPanel.add(requestBodyEditor.getComponent(), BorderLayout.CENTER);
+        bodyCards.add(requestBodyEditor.getComponent(), "JSON");
+        
+        formDataPanel = new ParamTablePanel(java.util.List.of(
+            vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA,
+            vn.io.codelearning.springapitester.model.ParamTypeEnum.MULTIPART_FILE,
+            vn.io.codelearning.springapitester.model.ParamTypeEnum.MODEL_ATTRIBUTE
+        ));
+        bodyCards.add(formDataPanel, "FORM_DATA");
+        
+        requestBodyPanel.add(bodyCards, BorderLayout.CENTER);
+        
+        // Logic switch
+        jsonRadio.addActionListener(e -> {
+            ((CardLayout) bodyCards.getLayout()).show(bodyCards, "JSON");
+            if (currentEndpoint != null) currentEndpoint.setBodyType(vn.io.codelearning.springapitester.model.RequestBodyType.JSON);
+            syncBtn.setVisible(true);
+        });
+        formRadio.addActionListener(e -> {
+            ((CardLayout) bodyCards.getLayout()).show(bodyCards, "FORM_DATA");
+            if (currentEndpoint != null) currentEndpoint.setBodyType(vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA);
+            syncBtn.setVisible(false); // No sync for form data table since scanner populates it directly
+        });
+
+        // Initialize default selection based on currentEndpoint later
+        this.jsonRadio = jsonRadio;
+        this.formRadio = formRadio;
+        this.bodyCards = bodyCards;
+        this.syncBtn = syncBtn;
 
         requestTabs.addTab("Params", paramPanel);
         requestTabs.addTab("Headers", headerPanel);
@@ -167,6 +216,7 @@ public class EndpointDetailPanel extends JPanel {
         urlField.setText(baseUrl + endpoint.getPath());
 
         paramPanel.setParameters(endpoint.getParameters());
+        formDataPanel.setParameters(endpoint.getParameters());
         headerPanel.setHeaders(endpoint.getCustomHeaders());
         authPanel.setAuthConfig(endpoint.getAuthConfig());
 
@@ -178,13 +228,27 @@ public class EndpointDetailPanel extends JPanel {
             responseBodyEditor.getDocument().setText("");
         });
         
+        // Set Body Type UI
+        if (endpoint.getBodyType() == vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA) {
+            formRadio.setSelected(true);
+            ((CardLayout) bodyCards.getLayout()).show(bodyCards, "FORM_DATA");
+            syncBtn.setVisible(false);
+        } else {
+            jsonRadio.setSelected(true);
+            ((CardLayout) bodyCards.getLayout()).show(bodyCards, "JSON");
+            syncBtn.setVisible(true);
+        }
+        
         statusLabel.setText("Ready");
         responseHeadersArea.setText("");
     }
 
     private void collectDataToModel() {
         if (currentEndpoint == null) return;
-        currentEndpoint.setParameters(paramPanel.getParameters());
+        // We don't overwrite currentEndpoint.setParameters() because the table models mutate the Param objects directly.
+        // If we do, we will lose internal framework params and form data params.
+        // We just leave endpoint.getParameters() intact.
+        
         currentEndpoint.setCustomHeaders(headerPanel.getHeaders());
         currentEndpoint.setAuthConfig(authPanel.getAuthConfig());
         currentEndpoint.setRequestBodyJson(requestBodyEditor.getDocument().getText());
@@ -223,16 +287,8 @@ public class EndpointDetailPanel extends JPanel {
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             try {
-                // Get URL from field instead of standard path to allow overrides
                 String fullUrl = urlField.getText();
-                // But HttpRequestBuilder expects baseUrl and endpoint path separately. 
-                // Let's parse out baseUrl
-                String tempBase = fullUrl;
-                if (currentEndpoint.getPath() != null && fullUrl.endsWith(currentEndpoint.getPath())) {
-                     tempBase = fullUrl.substring(0, fullUrl.length() - currentEndpoint.getPath().length());
-                }
-
-                Request request = HttpRequestBuilder.buildRequest(currentEndpoint, tempBase);
+                Request request = HttpRequestBuilder.buildRequest(currentEndpoint, fullUrl);
                 
                 HttpClientService.getInstance().executeAsync(request).thenAccept(response -> {
                     ApplicationManager.getApplication().invokeLater(() -> {

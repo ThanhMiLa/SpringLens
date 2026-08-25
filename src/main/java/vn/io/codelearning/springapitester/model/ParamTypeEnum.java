@@ -12,6 +12,7 @@ public enum ParamTypeEnum {
     MULTIPART_FILE("Multipart/File (@RequestPart / MultipartFile)", true),
     MODEL_ATTRIBUTE("Model Attribute (@ModelAttribute)", true),
     MATRIX_VARIABLE("Matrix Variable (@MatrixVariable)", true),
+    FORM_DATA("Form Data Field", true),
     FRAMEWORK_INTERNAL("Framework Internal (HttpServletRequest, Principal...)", false);
 
     private final String description;

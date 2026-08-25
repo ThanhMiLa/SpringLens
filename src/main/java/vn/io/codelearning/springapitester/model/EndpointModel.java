@@ -22,6 +22,7 @@ public class EndpointModel {
     private List<HeaderItem> customHeaders;
     private String requestBodyJson;
     private String requestBodyClassFqn;
+    private RequestBodyType bodyType = RequestBodyType.NONE;
     private String returnTypeClassFqn;    // Kiểu trả về của hàm (vd: ResponseEntity<UserDTO>)
     private String expectedResponseJson;  // JSON mẫu dự kiến sinh từ DTO trả về
     private AuthConfig authConfig;
@@ -171,6 +172,14 @@ public class EndpointModel {
 
     public void setAuthConfig(AuthConfig authConfig) {
         this.authConfig = (authConfig != null) ? authConfig : new AuthConfig();
+    }
+
+    public RequestBodyType getBodyType() {
+        return bodyType;
+    }
+
+    public void setBodyType(RequestBodyType bodyType) {
+        this.bodyType = bodyType;
     }
 
     public void addParameter(ParameterModel param) {

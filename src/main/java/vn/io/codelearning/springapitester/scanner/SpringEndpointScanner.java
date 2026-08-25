@@ -214,7 +214,11 @@ public class SpringEndpointScanner {
                     PsiAnnotationMemberValue defVal = anno.findAttributeValue("defaultValue");
                     if (defVal != null) {
                         String extracted = defVal.getText().replace("\"", "").trim();
-                        if (!extracted.isEmpty() && !extracted.contains("\n") && !extracted.contains("\u00E0")) {
+                        // Lọc bỏ hằng số ValueConstants.DEFAULT_NONE của Spring ("\n\t\t\n\t\t\n\uE000\uE001\uE002\n\t\t\t\t\n")
+                        // Khi gọi getText() nó sẽ trả về raw string chứa các ký tự \ n \ t
+                        if (!extracted.isEmpty() 
+                            && !extracted.contains("\\n\\t") 
+                            && !extracted.contains("\\uE000")) {
                             defaultValue = extracted;
                         }
                     }
@@ -248,13 +252,44 @@ public class SpringEndpointScanner {
                 };
             }
 
-            ParameterModel paramModel = new ParameterModel(finalName, paramType, simpleType, defaultValue, required, "", "");
-            endpoint.addParameter(paramModel);
-
             if (paramType == ParamTypeEnum.REQUEST_BODY) {
                 endpoint.setRequestBodyClassFqn(typeFqn);
+                ParameterModel paramModel = new ParameterModel(finalName, paramType, simpleType, defaultValue, required, "", "");
+                endpoint.addParameter(paramModel);
+            } else if (paramType == ParamTypeEnum.MODEL_ATTRIBUTE) {
+                // Đệ quy nhẹ lấy các field của ModelAttribute
+                PsiClass psiClass = extractPsiClass(parameter.getType());
+                if (psiClass != null && !psiClass.getQualifiedName().startsWith("java.")) {
+                    for (PsiField field : psiClass.getAllFields()) {
+                        if (field.hasModifierProperty(PsiModifier.STATIC) || field.hasModifierProperty(PsiModifier.TRANSIENT)) {
+                            continue;
+                        }
+                        String fieldName = field.getName();
+                        String fieldType = field.getType().getPresentableText();
+                        // Prefix with object name if needed, but usually spring maps directly
+                        ParameterModel fieldModel = new ParameterModel(fieldName, ParamTypeEnum.FORM_DATA, fieldType, "", false, "", "");
+                        endpoint.addParameter(fieldModel);
+                    }
+                } else {
+                    // Fallback
+                    ParameterModel paramModel = new ParameterModel(finalName, ParamTypeEnum.FORM_DATA, simpleType, defaultValue, required, "", "");
+                    endpoint.addParameter(paramModel);
+                }
+            } else if (paramType == ParamTypeEnum.MULTIPART_FILE) {
+                ParameterModel paramModel = new ParameterModel(finalName, ParamTypeEnum.FORM_DATA, simpleType, defaultValue, required, "", "");
+                endpoint.addParameter(paramModel);
+            } else {
+                ParameterModel paramModel = new ParameterModel(finalName, paramType, simpleType, defaultValue, required, "", "");
+                endpoint.addParameter(paramModel);
             }
         }
+    }
+
+    private PsiClass extractPsiClass(PsiType psiType) {
+        if (psiType instanceof PsiClassType classType) {
+            return classType.resolve();
+        }
+        return null;
     }
 
     private String buildMethodSignature(PsiMethod method) {

@@ -4,6 +4,7 @@ import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import okhttp3.MultipartBody;
 import vn.io.codelearning.springapitester.model.*;
 
 import java.nio.charset.StandardCharsets;
@@ -14,35 +15,21 @@ import java.util.Base64;
  */
 public class HttpRequestBuilder {
 
-    public static Request buildRequest(EndpointModel endpoint, String baseUrl) throws Exception {
-        if (baseUrl == null || baseUrl.isBlank()) {
-            throw new IllegalArgumentException("Base URL cannot be empty");
-        }
+    public static Request buildRequest(EndpointModel endpoint, String fullUrlPattern) {
+        String urlPath = fullUrlPattern;
 
-        // 1. Phân giải URL (Path Variables)
-        String urlPath = endpoint.getPath();
-        if (urlPath == null) urlPath = "";
-
+        // 1. Thay thế Path Variables
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
+                // Thay thế cả ở URL path
                 String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
                 urlPath = urlPath.replace("{" + param.getName() + "}", value);
             }
         }
 
-        // Tạo HttpUrl.Builder an toàn (tránh lỗi duplicate slash)
-        String fullUrl = baseUrl;
-        if (fullUrl.endsWith("/") && urlPath.startsWith("/")) {
-            fullUrl = fullUrl.substring(0, fullUrl.length() - 1) + urlPath;
-        } else if (!fullUrl.endsWith("/") && !urlPath.startsWith("/")) {
-            fullUrl = fullUrl + "/" + urlPath;
-        } else {
-            fullUrl = fullUrl + urlPath;
-        }
-
-        HttpUrl parsedUrl = HttpUrl.parse(fullUrl);
+        HttpUrl parsedUrl = HttpUrl.parse(urlPath);
         if (parsedUrl == null) {
-            throw new IllegalArgumentException("Invalid URL: " + fullUrl);
+            throw new IllegalArgumentException("Invalid URL: " + urlPath);
         }
         HttpUrl.Builder urlBuilder = parsedUrl.newBuilder();
 
@@ -50,7 +37,10 @@ public class HttpRequestBuilder {
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.QUERY_PARAM) {
                 String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
-                urlBuilder.addQueryParameter(param.getName(), value);
+                // Không gửi param nếu value rỗng để tránh Spring Boot báo lỗi ép kiểu (vd Enum, Integer)
+                if (!value.trim().isEmpty()) {
+                    urlBuilder.addQueryParameter(param.getName(), value);
+                }
             }
         }
 
@@ -109,11 +99,51 @@ public class HttpRequestBuilder {
         if (method == HttpMethodEnum.POST || method == HttpMethodEnum.PUT ||
             method == HttpMethodEnum.PATCH || method == HttpMethodEnum.DELETE) {
             
-            String json = endpoint.getRequestBodyJson();
-            if (json == null || json.trim().isEmpty()) {
-                json = "{}";
+            if (endpoint.getBodyType() == RequestBodyType.FORM_DATA) {
+                // Form Data Builder
+                MultipartBody.Builder multipartBuilder = new MultipartBody.Builder()
+                        .setType(MultipartBody.FORM);
+                
+                boolean hasData = false;
+                for (ParameterModel param : endpoint.getParameters()) {
+                    if (param.getParamType() == ParamTypeEnum.FORM_DATA || 
+                        param.getParamType() == ParamTypeEnum.MULTIPART_FILE ||
+                        param.getParamType() == ParamTypeEnum.MODEL_ATTRIBUTE) {
+                        
+                        String key = param.getName();
+                        String val = param.getCurrentValue() != null ? param.getCurrentValue() : "";
+                        if (key != null && !key.isEmpty()) {
+                            if (!val.trim().isEmpty()) {
+                                if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
+                                    // Giả lập một file upload với nội dung là text user nhập vào
+                                    RequestBody fileBody = RequestBody.create(val, MediaType.parse("application/octet-stream"));
+                                    multipartBuilder.addFormDataPart(key, "dummy.txt", fileBody);
+                                } else {
+                                    // Gửi text bình thường
+                                    multipartBuilder.addFormDataPart(key, val);
+                                }
+                                hasData = true;
+                            }
+                        }
+                    }
+                }
+                
+                // If form is empty, we must add an empty part or OkHttp will crash. 
+                // Alternatively, use an empty RequestBody
+                if (!hasData) {
+                    body = RequestBody.create("", MediaType.parse("text/plain"));
+                } else {
+                    body = multipartBuilder.build();
+                }
+                
+            } else {
+                // JSON Builder
+                String json = endpoint.getRequestBodyJson();
+                if (json == null || json.trim().isEmpty()) {
+                    json = "{}";
+                }
+                body = RequestBody.create(json, MediaType.parse("application/json; charset=utf-8"));
             }
-            body = RequestBody.create(json, MediaType.parse("application/json; charset=utf-8"));
             
         } else if (method == HttpMethodEnum.GET || method == HttpMethodEnum.HEAD) {
              // OkHttp bắt buộc body phải là null đối với GET/HEAD

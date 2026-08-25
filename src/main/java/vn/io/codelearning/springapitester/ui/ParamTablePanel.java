@@ -13,9 +13,9 @@ public class ParamTablePanel extends JPanel {
     private final JBTable table;
     private final ParamTableModel tableModel;
 
-    public ParamTablePanel() {
+    public ParamTablePanel(java.util.List<vn.io.codelearning.springapitester.model.ParamTypeEnum> allowedTypes) {
         setLayout(new BorderLayout());
-        tableModel = new ParamTableModel();
+        tableModel = new ParamTableModel(allowedTypes);
         table = new JBTable(tableModel);
         
         // Cột 0: Tên tham số (chỉ đọc)
@@ -40,13 +40,19 @@ public class ParamTablePanel extends JPanel {
     private static class ParamTableModel extends AbstractTableModel {
         private final String[] columnNames = {"Key", "Value", "Type"};
         private List<ParameterModel> params = new ArrayList<>();
+        private final List<vn.io.codelearning.springapitester.model.ParamTypeEnum> allowedTypes;
+
+        public ParamTableModel(List<vn.io.codelearning.springapitester.model.ParamTypeEnum> allowedTypes) {
+            this.allowedTypes = allowedTypes;
+        }
 
         public void setParams(List<ParameterModel> newParams) {
             this.params = new ArrayList<>();
-            // Chỉ lấy Path Variable và Query Param
             if (newParams != null) {
                 for (ParameterModel p : newParams) {
-                    if (p.getParamType().isUserEditable()) {
+                    if (allowedTypes != null && allowedTypes.contains(p.getParamType())) {
+                        this.params.add(p);
+                    } else if (allowedTypes == null && p.getParamType().isUserEditable()) {
                         this.params.add(p);
                     }
                 }
