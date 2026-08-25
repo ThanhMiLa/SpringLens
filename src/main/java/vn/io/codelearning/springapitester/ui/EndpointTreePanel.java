@@ -55,7 +55,7 @@ public class EndpointTreePanel extends JPanel {
         tree = new Tree(treeModel);
         tree.setRootVisible(false);
         tree.setShowsRootHandles(true);
-        // TODO: Add custom CellRenderer for colors
+        tree.setCellRenderer(new EndpointTreeCellRenderer());
 
         tree.addTreeSelectionListener(e -> {
             DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
