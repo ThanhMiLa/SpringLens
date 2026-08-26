@@ -257,6 +257,12 @@ public class SpringEndpointScanner {
                 ParameterModel paramModel = new ParameterModel(finalName, paramType, simpleType, defaultValue, required, "", "");
                 endpoint.addParameter(paramModel);
             } else if (paramType == ParamTypeEnum.MODEL_ATTRIBUTE) {
+                // Xác định kiểu param sẽ bung ra (Query Param cho GET, Form Data cho POST)
+                ParamTypeEnum explodedType = ParamTypeEnum.FORM_DATA;
+                if (endpoint.getHttpMethod() == HttpMethodEnum.GET || endpoint.getHttpMethod() == HttpMethodEnum.DELETE) {
+                    explodedType = ParamTypeEnum.QUERY_PARAM;
+                }
+                
                 // Đệ quy nhẹ lấy các field của ModelAttribute
                 PsiClass psiClass = extractPsiClass(parameter.getType());
                 if (psiClass != null && !psiClass.getQualifiedName().startsWith("java.")) {
@@ -266,13 +272,12 @@ public class SpringEndpointScanner {
                         }
                         String fieldName = field.getName();
                         String fieldType = field.getType().getPresentableText();
-                        // Prefix with object name if needed, but usually spring maps directly
-                        ParameterModel fieldModel = new ParameterModel(fieldName, ParamTypeEnum.FORM_DATA, fieldType, "", false, "", "");
+                        ParameterModel fieldModel = new ParameterModel(fieldName, explodedType, fieldType, "", false, "", "");
                         endpoint.addParameter(fieldModel);
                     }
                 } else {
                     // Fallback
-                    ParameterModel paramModel = new ParameterModel(finalName, ParamTypeEnum.FORM_DATA, simpleType, defaultValue, required, "", "");
+                    ParameterModel paramModel = new ParameterModel(finalName, explodedType, simpleType, defaultValue, required, "", "");
                     endpoint.addParameter(paramModel);
                 }
             } else if (paramType == ParamTypeEnum.MULTIPART_FILE) {

@@ -62,6 +62,15 @@ public enum ParamTypeEnum {
         }
 
         // Mặc định nếu không có annotation gì
+        // Nếu là kiểu nguyên thủy hoặc java.lang.*, java.util.* thì là QUERY_PARAM
+        // Nếu là object phức tạp (DTO) thì Spring ngầm định là MODEL_ATTRIBUTE
+        if (typeFqn != null && !typeFqn.startsWith("java.") && !typeFqn.isBlank()) {
+            // Các kiểu nguyên thủy (int, boolean, double...) sẽ không có typeFqn chứa dấu chấm
+            if (typeFqn.contains(".")) {
+                return MODEL_ATTRIBUTE;
+            }
+        }
+        
         return QUERY_PARAM;
     }
 }
