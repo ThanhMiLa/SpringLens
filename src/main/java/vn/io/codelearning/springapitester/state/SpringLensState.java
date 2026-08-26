@@ -17,6 +17,10 @@ import java.util.Map;
 public class SpringLensState implements PersistentStateComponent<SpringLensState> {
 
     public Map<String, EndpointSavedState> endpoints = new HashMap<>();
+    
+    // Module 7: Manual structures
+    public java.util.List<vn.io.codelearning.springapitester.model.FolderModel> manualFolders = new java.util.ArrayList<>();
+    public java.util.List<EndpointSavedState> manualEndpoints = new java.util.ArrayList<>();
 
     public static SpringLensState getInstance(Project project) {
         return project.getService(SpringLensState.class);
@@ -53,7 +57,30 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             }
         }
         
-        endpoints.put(getEndpointKey(endpoint), saved);
+        if (endpoint.isManual()) {
+            saved.id = endpoint.getId();
+            saved.name = endpoint.getName();
+            saved.isManual = true;
+            saved.folderId = endpoint.getFolderId();
+            saved.httpMethod = endpoint.getHttpMethod();
+            saved.path = endpoint.getPath();
+            // Deep copy parameters
+            saved.manualParameters = new java.util.ArrayList<>();
+            for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
+                vn.io.codelearning.springapitester.model.ParameterModel clone = new vn.io.codelearning.springapitester.model.ParameterModel();
+                clone.setName(param.getName());
+                clone.setParamType(param.getParamType());
+                clone.setCurrentValue(param.getCurrentValue());
+                clone.setRequired(param.isRequired());
+                clone.setDefaultValue(param.getDefaultValue());
+                saved.manualParameters.add(clone);
+            }
+            // Update or add
+            manualEndpoints.removeIf(e -> e.id != null && e.id.equals(saved.id));
+            manualEndpoints.add(saved);
+        } else {
+            endpoints.put(getEndpointKey(endpoint), saved);
+        }
     }
 
     public void restoreEndpoint(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {

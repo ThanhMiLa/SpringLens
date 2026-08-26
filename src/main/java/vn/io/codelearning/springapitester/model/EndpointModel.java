@@ -11,6 +11,9 @@ import java.util.stream.Collectors;
  */
 public class EndpointModel {
     private String id;
+    private String name;
+    private boolean isManual = false;
+    private String folderId;
     private HttpMethodEnum httpMethod;
     private String path;
     private String controllerName;
@@ -29,6 +32,9 @@ public class EndpointModel {
 
     public EndpointModel() {
         this.id = UUID.randomUUID().toString();
+        this.name = "";
+        this.isManual = false;
+        this.folderId = "";
         this.httpMethod = HttpMethodEnum.GET;
         this.path = "";
         this.controllerName = "";
@@ -257,4 +263,13 @@ public class EndpointModel {
     public String toString() {
         return getDisplayName();
     }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    
+    public boolean isManual() { return isManual; }
+    public void setManual(boolean manual) { isManual = manual; }
+    
+    public String getFolderId() { return folderId; }
+    public void setFolderId(String folderId) { this.folderId = folderId; }
 }

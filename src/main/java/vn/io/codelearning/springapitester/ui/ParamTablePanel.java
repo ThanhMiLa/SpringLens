@@ -78,7 +78,31 @@ public class ParamTablePanel extends JPanel {
             }
         });
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        com.intellij.ui.ToolbarDecorator decorator = com.intellij.ui.ToolbarDecorator.createDecorator(table);
+        decorator.setAddAction(button -> {
+            ParameterModel newParam = new ParameterModel();
+            newParam.setName("new_param");
+            if (allowedTypes != null && !allowedTypes.isEmpty()) {
+                newParam.setParamType(allowedTypes.get(0));
+            } else {
+                newParam.setParamType(vn.io.codelearning.springapitester.model.ParamTypeEnum.QUERY_PARAM);
+            }
+            newParam.setRequired(false);
+            tableModel.params.add(newParam);
+            tableModel.fireTableRowsInserted(tableModel.params.size() - 1, tableModel.params.size() - 1);
+        });
+        
+        decorator.setRemoveAction(button -> {
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow >= 0 && selectedRow < tableModel.params.size()) {
+                tableModel.params.remove(selectedRow);
+                tableModel.fireTableRowsDeleted(selectedRow, selectedRow);
+            }
+        });
+        
+        add(decorator.createPanel(), BorderLayout.CENTER);
     }
 
     public void setParameters(List<ParameterModel> params) {
@@ -133,9 +157,10 @@ public class ParamTablePanel extends JPanel {
 
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex) {
+            // Cho phép sửa Tên (0), Giá trị (1) và Loại (2) 
+            if (columnIndex == 0) return true;
             if (columnIndex == 1) return true;
             if (columnIndex == 2) {
-                // Chỉ cho phép đổi Text/File đối với FORM_DATA hoặc MULTIPART_FILE
                 ParameterModel p = params.get(rowIndex);
                 return p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA 
                     || p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.MULTIPART_FILE;
@@ -159,7 +184,12 @@ public class ParamTablePanel extends JPanel {
 
         @Override
         public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
-            if (columnIndex == 1) {
+            if (columnIndex == 0) {
+                String val = aValue.toString();
+                if (val.endsWith(" *")) val = val.substring(0, val.length() - 2);
+                params.get(rowIndex).setName(val);
+                fireTableCellUpdated(rowIndex, columnIndex);
+            } else if (columnIndex == 1) {
                 params.get(rowIndex).setCurrentValue(aValue.toString());
                 fireTableCellUpdated(rowIndex, columnIndex);
             } else if (columnIndex == 2) {

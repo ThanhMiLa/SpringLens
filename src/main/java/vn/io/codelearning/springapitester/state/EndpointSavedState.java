@@ -17,4 +17,13 @@ public class EndpointSavedState {
     public RequestBodyType bodyType = RequestBodyType.NONE;
     public boolean isSecuredOverride = false;
     public boolean hasSecuredOverride = false;
+    
+    // Module 7: Fields for manual endpoints
+    public String id;
+    public String name;
+    public boolean isManual = false;
+    public String folderId;
+    public vn.io.codelearning.springapitester.model.HttpMethodEnum httpMethod;
+    public String path;
+    public List<vn.io.codelearning.springapitester.model.ParameterModel> manualParameters = new ArrayList<>();
 }

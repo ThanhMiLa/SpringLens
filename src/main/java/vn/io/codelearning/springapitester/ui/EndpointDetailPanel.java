@@ -22,7 +22,7 @@ public class EndpointDetailPanel extends JPanel {
     private final Project project;
     private EndpointModel currentEndpoint;
 
-    private final JBLabel methodLabel;
+    private final com.intellij.openapi.ui.ComboBox<vn.io.codelearning.springapitester.model.HttpMethodEnum> methodComboBox;
     private final JBTextField urlField;
     private final JButton sendBtn;
 
@@ -62,8 +62,8 @@ public class EndpointDetailPanel extends JPanel {
         JPanel topBar = new JPanel(new BorderLayout(5, 5));
         topBar.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         
-        methodLabel = new JBLabel("GET");
-        methodLabel.setFont(methodLabel.getFont().deriveFont(Font.BOLD));
+        methodComboBox = new com.intellij.openapi.ui.ComboBox<>(vn.io.codelearning.springapitester.model.HttpMethodEnum.values());
+        methodComboBox.setPreferredSize(new Dimension(80, methodComboBox.getPreferredSize().height));
         
         urlField = new JBTextField();
         
@@ -85,7 +85,7 @@ public class EndpointDetailPanel extends JPanel {
         btnPanel.add(curlBtn);
         btnPanel.add(sendBtn);
 
-        topBar.add(methodLabel, BorderLayout.WEST);
+        topBar.add(methodComboBox, BorderLayout.WEST);
         topBar.add(urlField, BorderLayout.CENTER);
         topBar.add(btnPanel, BorderLayout.EAST);
         
@@ -244,12 +244,12 @@ public class EndpointDetailPanel extends JPanel {
 
         this.currentEndpoint = endpoint;
         if (endpoint == null) {
-            methodLabel.setText("");
+            methodComboBox.setSelectedItem(vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
             urlField.setText("");
             return;
         }
 
-        methodLabel.setText(endpoint.getHttpMethod().getLabel());
+        methodComboBox.setSelectedItem(endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
         urlField.setText(baseUrl + endpoint.getPath());
 
         paramPanel.setParameters(endpoint.getParameters());
@@ -286,6 +286,17 @@ public class EndpointDetailPanel extends JPanel {
         // We don't overwrite currentEndpoint.setParameters() because the table models mutate the Param objects directly.
         // If we do, we will lose internal framework params and form data params.
         // We just leave endpoint.getParameters() intact.
+        vn.io.codelearning.springapitester.model.HttpMethodEnum method = (vn.io.codelearning.springapitester.model.HttpMethodEnum) methodComboBox.getSelectedItem();
+        if (method != null) {
+            currentEndpoint.setHttpMethod(method);
+        }
+        
+        String url = urlField.getText();
+        if (url.startsWith(baseUrl)) {
+            currentEndpoint.setPath(url.substring(baseUrl.length()));
+        } else {
+            currentEndpoint.setPath(url);
+        }
         
         currentEndpoint.setCustomHeaders(headerPanel.getHeaders());
         currentEndpoint.setAuthConfig(authPanel.getAuthConfig());
