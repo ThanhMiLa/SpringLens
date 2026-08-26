@@ -34,6 +34,7 @@ public class EndpointTreePanel extends JPanel {
         this.onReloadClicked = onReloadClicked;
 
         setLayout(new BorderLayout());
+        setMinimumSize(new Dimension(100, 100));
 
         // 1. Top Panel: Search + Reload Button
         JPanel topPanel = new JPanel(new BorderLayout());
@@ -96,5 +97,9 @@ public class EndpointTreePanel extends JPanel {
         for (int i = 0; i < tree.getRowCount(); i++) {
             tree.expandRow(i);
         }
+    }
+    
+    public void repaintTree() {
+        tree.repaint();
     }
 }

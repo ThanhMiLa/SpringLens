@@ -9,6 +9,7 @@ import com.intellij.ui.content.ContentFactory;
 import org.jetbrains.annotations.NotNull;
 import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.scanner.SpringEndpointScanner;
+import vn.io.codelearning.springapitester.client.HttpClientService;
 
 import javax.swing.*;
 import java.util.ArrayList;
@@ -22,6 +23,9 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         // Create the main panel
         JBSplitter mainSplitter = new JBSplitter(false, 0.3f);
+        mainSplitter.setShowDividerControls(true); // Hiển thị nút < > để kéo thả
+        mainSplitter.setDividerWidth(7); // Tăng độ dày để dễ cầm kéo
+        mainSplitter.setShowDividerIcon(true);
 
         EndpointDetailPanel detailPanel = new EndpointDetailPanel(project);
         
@@ -35,9 +39,7 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
             },
             () -> {
                 // When Reload is clicked
-                // TODO: Backup current state (Smart Merge preparation)
                 endpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
-                // TODO: Restore state
                 
                 // Update Tree
                 treePanelHolder[0].updateEndpoints(endpoints);
@@ -46,6 +48,12 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
 
         mainSplitter.setFirstComponent(treePanelHolder[0]);
         mainSplitter.setSecondComponent(detailPanel);
+        
+        detailPanel.setOnEndpointUpdated(() -> {
+            if (treePanelHolder[0] != null) {
+                treePanelHolder[0].repaintTree();
+            }
+        });
 
         // Register the content
         ContentFactory contentFactory = ContentFactory.getInstance();

@@ -10,8 +10,11 @@ import java.awt.event.ItemEvent;
 
 public class AuthPanel extends JPanel {
     private final ComboBox<AuthTypeEnum> authTypeCombo;
+    private final JCheckBox isSecuredCheck;
     private final JPanel cardsPanel;
     private final CardLayout cardLayout;
+    
+    private java.util.function.Consumer<Boolean> onSecurityToggled;
 
     // Bearer fields
     private final JTextField bearerTokenField;
@@ -33,9 +36,21 @@ public class AuthPanel extends JPanel {
         // Combo Box
         authTypeCombo = new ComboBox<>(AuthTypeEnum.values());
         
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        topPanel.add(new JLabel("Type:"));
-        topPanel.add(authTypeCombo);
+        isSecuredCheck = new JCheckBox("Endpoint requires authentication (Secured)");
+        isSecuredCheck.addActionListener(e -> {
+            if (onSecurityToggled != null) {
+                onSecurityToggled.accept(isSecuredCheck.isSelected());
+            }
+        });
+        
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
+        topPanel.add(isSecuredCheck);
+        
+        JPanel typePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        typePanel.add(new JLabel("Auth Type:"));
+        typePanel.add(authTypeCombo);
+        topPanel.add(typePanel);
+        
         add(topPanel, BorderLayout.NORTH);
 
         // Card Layout for dynamic forms
@@ -84,6 +99,14 @@ public class AuthPanel extends JPanel {
                 cardLayout.show(cardsPanel, selected.name());
             }
         });
+    }
+    
+    public void setOnSecurityToggled(java.util.function.Consumer<Boolean> listener) {
+        this.onSecurityToggled = listener;
+    }
+    
+    public void setSecuredStatus(boolean isSecured) {
+        this.isSecuredCheck.setSelected(isSecured);
     }
 
     public void setAuthConfig(AuthConfig config) {

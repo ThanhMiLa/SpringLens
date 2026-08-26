@@ -51,8 +51,10 @@ public class HttpRequestBuilder {
         if (auth != null) {
             switch (auth.getAuthType()) {
                 case BEARER_TOKEN:
-                    String token = auth.getBearerToken() != null ? auth.getBearerToken() : "";
-                    requestBuilder.addHeader("Authorization", "Bearer " + token);
+                    String token = auth.getBearerToken() != null ? auth.getBearerToken().trim() : "";
+                    if (!token.isEmpty()) {
+                        requestBuilder.addHeader("Authorization", "Bearer " + token);
+                    }
                     break;
                 case BASIC_AUTH:
                     String user = auth.getUsername() != null ? auth.getUsername() : "";

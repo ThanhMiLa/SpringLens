@@ -21,12 +21,16 @@ public class HttpClientService {
     private final OkHttpClient client;
     private final Gson gson;
 
+    private final InMemoryCookieJar cookieJar;
+
     private HttpClientService() {
+        this.cookieJar = new InMemoryCookieJar();
         this.client = new OkHttpClient.Builder()
-                .cookieJar(new InMemoryCookieJar())
+                .cookieJar(cookieJar)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
                 .build();
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
@@ -36,6 +40,10 @@ public class HttpClientService {
             instance = new HttpClientService();
         }
         return instance;
+    }
+    
+    public void clearCookies() {
+        cookieJar.clearAll();
     }
 
     /**

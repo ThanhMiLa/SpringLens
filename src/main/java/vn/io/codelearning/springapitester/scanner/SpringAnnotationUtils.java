@@ -226,14 +226,8 @@ public final class SpringAnnotationUtils {
         Boolean classLevel = checkSecurityAnnotation(controllerClass);
         if (classLevel != null) return classLevel;
 
-        String lower = fullPath.toLowerCase();
-        for (String prefix : PUBLIC_PATH_PREFIXES) {
-            if (lower.startsWith(prefix) || lower.contains(prefix + "/")) {
-                return false;
-            }
-        }
-
-        return true;
+        // Mặc định (Unknown), giả định là Public để tiện sử dụng, dev có thể tự bật/tắt
+        return false;
     }
 
     private static Boolean checkSecurityAnnotation(PsiModifierListOwner element) {

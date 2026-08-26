@@ -45,11 +45,18 @@ public class EndpointDetailPanel extends JPanel {
 
     // Default local base URL for testing
     private String baseUrl;
+    
+    private Runnable onEndpointUpdated;
+    
+    public void setOnEndpointUpdated(Runnable onEndpointUpdated) {
+        this.onEndpointUpdated = onEndpointUpdated;
+    }
 
     public EndpointDetailPanel(Project project) {
         this.project = project;
         this.baseUrl = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
         setLayout(new BorderLayout());
+        setMinimumSize(new Dimension(100, 100));
 
         // 1. Top Bar
         JPanel topBar = new JPanel(new BorderLayout(5, 5));
@@ -61,6 +68,7 @@ public class EndpointDetailPanel extends JPanel {
         urlField = new JBTextField();
         
         sendBtn = new JButton("Send");
+        sendBtn.putClientProperty("JButton.buttonType", "default");
         sendBtn.addActionListener(e -> onSendClicked());
 
         topBar.add(methodLabel, BorderLayout.WEST);
@@ -74,6 +82,9 @@ public class EndpointDetailPanel extends JPanel {
 
         // 2. Splitter for Request / Response
         JBSplitter mainSplitter = new JBSplitter(true, 0.5f);
+        mainSplitter.setShowDividerControls(true);
+        mainSplitter.setDividerWidth(7);
+        mainSplitter.setShowDividerIcon(true);
         
         // --- 2.1 Request Tabs ---
         JBTabbedPane requestTabs = new JBTabbedPane();
@@ -83,6 +94,14 @@ public class EndpointDetailPanel extends JPanel {
         ));
         headerPanel = new HeaderTablePanel();
         authPanel = new AuthPanel();
+        authPanel.setOnSecurityToggled(isSecured -> {
+            if (currentEndpoint != null) {
+                currentEndpoint.setSecured(isSecured);
+                if (onEndpointUpdated != null) {
+                    onEndpointUpdated.run();
+                }
+            }
+        });
         
         // Request Body with Toolbar
         requestBodyPanel = new JPanel(new BorderLayout());
@@ -223,6 +242,7 @@ public class EndpointDetailPanel extends JPanel {
         formDataPanel.setParameters(endpoint.getParameters());
         headerPanel.setHeaders(endpoint.getCustomHeaders());
         authPanel.setAuthConfig(endpoint.getAuthConfig());
+        authPanel.setSecuredStatus(endpoint.isSecured());
 
         String json = endpoint.getRequestBodyJson() != null ? endpoint.getRequestBodyJson() : "";
         
@@ -282,6 +302,31 @@ public class EndpointDetailPanel extends JPanel {
         });
     }
 
+    private String getHttpStatusMessage(int code) {
+        return switch (code) {
+            case 100 -> "Continue";
+            case 101 -> "Switching Protocols";
+            case 200 -> "OK";
+            case 201 -> "Created";
+            case 202 -> "Accepted";
+            case 204 -> "No Content";
+            case 301 -> "Moved Permanently";
+            case 302 -> "Found";
+            case 304 -> "Not Modified";
+            case 400 -> "Bad Request";
+            case 401 -> "Unauthorized";
+            case 403 -> "Forbidden";
+            case 404 -> "Not Found";
+            case 405 -> "Method Not Allowed";
+            case 409 -> "Conflict";
+            case 500 -> "Internal Server Error";
+            case 502 -> "Bad Gateway";
+            case 503 -> "Service Unavailable";
+            case 504 -> "Gateway Timeout";
+            default -> "Unknown";
+        };
+    }
+
     private void onSendClicked() {
         if (currentEndpoint == null) return;
         collectDataToModel();
@@ -296,7 +341,20 @@ public class EndpointDetailPanel extends JPanel {
                 
                 HttpClientService.getInstance().executeAsync(request).thenAccept(response -> {
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        statusLabel.setText("Status: " + response.getStatusCode() + " " + response.getStatusMessage() + " | Time: " + response.getTimeTakenMs() + "ms");
+                        int code = response.getStatusCode();
+                        String colorHex = "#7A7A7A"; // Default gray
+                        if (code >= 200 && code < 300) colorHex = "#5CB85C"; // Green
+                        else if (code >= 300 && code < 400) colorHex = "#5BC0DE"; // Cyan
+                        else if (code >= 400 && code < 600) colorHex = "#D9534F"; // Red
+                        
+                        String msg = response.getStatusMessage();
+                        if (msg == null || msg.isBlank()) {
+                            msg = getHttpStatusMessage(code);
+                        }
+                        
+                        String html = String.format("<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span><font color='gray'> &nbsp; %d ms</font></html>", 
+                                                    colorHex, code, msg, response.getTimeTakenMs());
+                        statusLabel.setText(html);
                         
                         // Update Response Body Editor
                         ApplicationManager.getApplication().runWriteAction(() -> {

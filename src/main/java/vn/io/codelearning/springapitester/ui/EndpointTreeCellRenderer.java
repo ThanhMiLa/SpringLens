@@ -25,8 +25,11 @@ public class EndpointTreeCellRenderer extends ColoredTreeCellRenderer {
             append((String) userObject, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
         } else if (userObject instanceof EndpointModel endpoint) {
             // Endpoint Node
-            setIcon(com.intellij.icons.AllIcons.Nodes.Method);
-
+            if (endpoint.isSecured()) {
+                setIcon(com.intellij.icons.AllIcons.Nodes.Padlock); // Khóa
+            } else {
+                setIcon(null); // Bỏ trống không hiển thị icon cho API public
+            }
             HttpMethodEnum method = endpoint.getHttpMethod();
             if (method == null) method = HttpMethodEnum.GET;
 

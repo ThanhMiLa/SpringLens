@@ -26,4 +26,8 @@ public class InMemoryCookieJar implements CookieJar {
     public List<Cookie> loadForRequest(@NotNull HttpUrl url) {
         return cookieStore.getOrDefault(url.host(), new ArrayList<>());
     }
+    
+    public void clearAll() {
+        cookieStore.clear();
+    }
 }
