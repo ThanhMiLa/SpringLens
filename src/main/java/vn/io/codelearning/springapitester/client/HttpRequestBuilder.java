@@ -115,9 +115,16 @@ public class HttpRequestBuilder {
                         if (key != null && !key.isEmpty()) {
                             if (!val.trim().isEmpty()) {
                                 if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
-                                    // Giả lập một file upload với nội dung là text user nhập vào
-                                    RequestBody fileBody = RequestBody.create(val, MediaType.parse("application/octet-stream"));
-                                    multipartBuilder.addFormDataPart(key, "dummy.txt", fileBody);
+                                    java.io.File file = new java.io.File(val);
+                                    if (file.exists() && file.isFile()) {
+                                        // Upload file thật
+                                        RequestBody fileBody = RequestBody.create(file, MediaType.parse("application/octet-stream"));
+                                        multipartBuilder.addFormDataPart(key, file.getName(), fileBody);
+                                    } else {
+                                        // Giả lập file upload từ text
+                                        RequestBody fileBody = RequestBody.create(val, MediaType.parse("application/octet-stream"));
+                                        multipartBuilder.addFormDataPart(key, "dummy.txt", fileBody);
+                                    }
                                 } else {
                                     // Gửi text bình thường
                                     multipartBuilder.addFormDataPart(key, val);

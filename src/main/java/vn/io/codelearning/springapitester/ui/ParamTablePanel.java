@@ -25,6 +25,58 @@ public class ParamTablePanel extends JPanel {
         table.getColumnModel().getColumn(0).setPreferredWidth(150);
         table.getColumnModel().getColumn(1).setPreferredWidth(250);
         table.getColumnModel().getColumn(2).setPreferredWidth(100);
+        
+        // ComboBox cho cột Type
+        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"Text", "File"});
+        table.getColumnModel().getColumn(2).setCellEditor(new DefaultCellEditor(typeCombo));
+
+        // Renderer cho cột Value
+        table.getColumnModel().getColumn(1).setCellRenderer(new javax.swing.table.DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                String typeStr = (String) table.getValueAt(row, 2);
+                if ("File".equals(typeStr)) {
+                    String text = (value != null && !value.toString().isBlank()) ? value.toString() : "Select files...";
+                    return super.getTableCellRendererComponent(table, "📁 " + text, isSelected, hasFocus, row, column);
+                }
+                return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            }
+        });
+
+        // Editor cho cột Value
+        table.getColumnModel().getColumn(1).setCellEditor(new DefaultCellEditor(new JTextField()) {
+            private com.intellij.openapi.ui.TextFieldWithBrowseButton filePicker;
+            private JTextField textField;
+            private boolean isFile = false;
+
+            {
+                textField = new JTextField();
+                filePicker = new com.intellij.openapi.ui.TextFieldWithBrowseButton();
+                filePicker.addBrowseFolderListener(
+                    "Select File", "Choose a file to upload", null,
+                    com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
+                );
+            }
+
+            @Override
+            public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+                String typeStr = (String) table.getValueAt(row, 2);
+                isFile = "File".equals(typeStr);
+                
+                if (isFile) {
+                    filePicker.setText(value != null ? value.toString() : "");
+                    return filePicker;
+                } else {
+                    textField.setText(value != null ? value.toString() : "");
+                    return textField;
+                }
+            }
+
+            @Override
+            public Object getCellEditorValue() {
+                return isFile ? filePicker.getText() : textField.getText();
+            }
+        });
 
         add(new JScrollPane(table), BorderLayout.CENTER);
     }
@@ -81,7 +133,14 @@ public class ParamTablePanel extends JPanel {
 
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex) {
-            return columnIndex == 1; // Chỉ cột Value mới được sửa
+            if (columnIndex == 1) return true;
+            if (columnIndex == 2) {
+                // Chỉ cho phép đổi Text/File đối với FORM_DATA hoặc MULTIPART_FILE
+                ParameterModel p = params.get(rowIndex);
+                return p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA 
+                    || p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.MULTIPART_FILE;
+            }
+            return false;
         }
 
         @Override
@@ -90,7 +149,10 @@ public class ParamTablePanel extends JPanel {
             switch (columnIndex) {
                 case 0: return p.getName() + (p.isRequired() ? " *" : "");
                 case 1: return p.getCurrentValue() != null ? p.getCurrentValue() : "";
-                case 2: return p.getParamType().name();
+                case 2: 
+                    if (p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA) return "Text";
+                    if (p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.MULTIPART_FILE) return "File";
+                    return p.getParamType().name();
                 default: return "";
             }
         }
@@ -100,6 +162,18 @@ public class ParamTablePanel extends JPanel {
             if (columnIndex == 1) {
                 params.get(rowIndex).setCurrentValue(aValue.toString());
                 fireTableCellUpdated(rowIndex, columnIndex);
+            } else if (columnIndex == 2) {
+                String val = aValue.toString();
+                if ("Text".equals(val)) {
+                    params.get(rowIndex).setParamType(vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA);
+                } else if ("File".equals(val)) {
+                    params.get(rowIndex).setParamType(vn.io.codelearning.springapitester.model.ParamTypeEnum.MULTIPART_FILE);
+                    // Clear the current value (which might be text) when switching to File
+                    params.get(rowIndex).setCurrentValue("");
+                }
+                fireTableCellUpdated(rowIndex, columnIndex);
+                // Cần update lại cột Value để hiển thị file picker hoặc text field tương ứng
+                fireTableCellUpdated(rowIndex, 1);
             }
         }
     }

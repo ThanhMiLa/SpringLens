@@ -40,7 +40,12 @@ public class EndpointTreeCellRenderer extends ColoredTreeCellRenderer {
             String methodStr = String.format("%-7s", method.getLabel());
             append(methodStr, methodAttr);
 
-            // Draw Path in Bold
+            // Tên Java Method
+            if (endpoint.getMethodName() != null && !endpoint.getMethodName().isBlank()) {
+                append(endpoint.getMethodName() + "   ", SimpleTextAttributes.GRAY_ATTRIBUTES);
+            }
+
+            // Draw Path in Regular
             append(endpoint.getPath() != null ? endpoint.getPath() : "", SimpleTextAttributes.REGULAR_ATTRIBUTES);
         }
     }

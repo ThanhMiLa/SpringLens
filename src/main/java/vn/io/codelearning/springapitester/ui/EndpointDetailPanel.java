@@ -66,7 +66,11 @@ public class EndpointDetailPanel extends JPanel {
         topBar.add(methodLabel, BorderLayout.WEST);
         topBar.add(urlField, BorderLayout.CENTER);
         topBar.add(sendBtn, BorderLayout.EAST);
-        add(topBar, BorderLayout.NORTH);
+        
+        JPanel headerPanelWrap = new JPanel(new BorderLayout());
+        headerPanelWrap.add(topBar, BorderLayout.CENTER);
+        
+        add(headerPanelWrap, BorderLayout.NORTH);
 
         // 2. Splitter for Request / Response
         JBSplitter mainSplitter = new JBSplitter(true, 0.5f);

@@ -272,7 +272,11 @@ public class SpringEndpointScanner {
                         }
                         String fieldName = field.getName();
                         String fieldType = field.getType().getPresentableText();
-                        ParameterModel fieldModel = new ParameterModel(fieldName, explodedType, fieldType, "", false, "", "");
+                        ParamTypeEnum actualFieldType = explodedType;
+                        if (fieldType.contains("MultipartFile")) {
+                            actualFieldType = ParamTypeEnum.MULTIPART_FILE;
+                        }
+                        ParameterModel fieldModel = new ParameterModel(fieldName, actualFieldType, fieldType, "", false, "", "");
                         endpoint.addParameter(fieldModel);
                     }
                 } else {
