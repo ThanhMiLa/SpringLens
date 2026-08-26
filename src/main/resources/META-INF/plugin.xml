@@ -20,5 +20,6 @@
                 anchor="right"
                 factoryClass="vn.io.codelearning.springapitester.ui.SpringLensToolWindowFactory"
                 icon="AllIcons.Nodes.WebFolder"/>
+    <projectService serviceImplementation="vn.io.codelearning.springapitester.state.SpringLensState"/>
   </extensions>
 </idea-plugin>

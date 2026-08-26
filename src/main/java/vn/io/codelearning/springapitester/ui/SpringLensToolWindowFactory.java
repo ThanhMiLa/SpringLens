@@ -41,6 +41,14 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                 // When Reload is clicked
                 endpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
                 
+                // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
+                vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                if (state != null) {
+                    for (EndpointModel ep : endpoints) {
+                        state.restoreEndpoint(ep);
+                    }
+                }
+                
                 // Update Tree
                 treePanelHolder[0].updateEndpoints(endpoints);
             }

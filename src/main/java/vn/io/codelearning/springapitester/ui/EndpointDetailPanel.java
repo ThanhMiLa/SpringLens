@@ -71,9 +71,23 @@ public class EndpointDetailPanel extends JPanel {
         sendBtn.putClientProperty("JButton.buttonType", "default");
         sendBtn.addActionListener(e -> onSendClicked());
 
+        JButton curlBtn = new JButton("cURL");
+        curlBtn.setToolTipText("Copy as cURL");
+        curlBtn.addActionListener(e -> {
+            if (currentEndpoint == null) return;
+            collectDataToModel();
+            String curl = vn.io.codelearning.springapitester.client.CurlBuilder.buildCurl(currentEndpoint, urlField.getText());
+            com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(new java.awt.datatransfer.StringSelection(curl));
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "cURL command copied to clipboard!", "Success");
+        });
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
+        btnPanel.add(curlBtn);
+        btnPanel.add(sendBtn);
+
         topBar.add(methodLabel, BorderLayout.WEST);
         topBar.add(urlField, BorderLayout.CENTER);
-        topBar.add(sendBtn, BorderLayout.EAST);
+        topBar.add(btnPanel, BorderLayout.EAST);
         
         JPanel headerPanelWrap = new JPanel(new BorderLayout());
         headerPanelWrap.add(topBar, BorderLayout.CENTER);
@@ -276,6 +290,12 @@ public class EndpointDetailPanel extends JPanel {
         currentEndpoint.setCustomHeaders(headerPanel.getHeaders());
         currentEndpoint.setAuthConfig(authPanel.getAuthConfig());
         currentEndpoint.setRequestBodyJson(requestBodyEditor.getDocument().getText());
+        
+        // Tự động lưu trạng thái (State Persistence)
+        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        if (state != null) {
+            state.saveEndpoint(currentEndpoint);
+        }
     }
 
     private void onSyncSchemaClicked() {
