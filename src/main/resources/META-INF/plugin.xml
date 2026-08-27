@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>vn.io.codelearning.springapitester</id>
     <name>SpringLens</name>
-    <vendor url="https://codelearning.io.vn">ThanhMiLa</vendor>
+    <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
         <p><b>Spring API Tester</b> là một plugin siêu nhẹ hỗ trợ kiểm thử API.</p>
