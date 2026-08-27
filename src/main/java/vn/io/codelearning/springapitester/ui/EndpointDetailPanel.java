@@ -64,8 +64,34 @@ public class EndpointDetailPanel extends JPanel {
         
         methodComboBox = new com.intellij.openapi.ui.ComboBox<>(vn.io.codelearning.springapitester.model.HttpMethodEnum.values());
         methodComboBox.setPreferredSize(new Dimension(80, methodComboBox.getPreferredSize().height));
+        methodComboBox.addItemListener(e -> {
+            if (!isUpdatingUI && e.getStateChange() == java.awt.event.ItemEvent.SELECTED && currentEndpoint != null) {
+                currentEndpoint.setHttpMethod((vn.io.codelearning.springapitester.model.HttpMethodEnum) e.getItem());
+                if (onEndpointUpdated != null) {
+                    onEndpointUpdated.run();
+                }
+            }
+        });
         
         urlField = new JBTextField();
+        urlField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void update() {
+                if (!isUpdatingUI && currentEndpoint != null) {
+                    String url = urlField.getText();
+                    if (url.startsWith(baseUrl)) {
+                        currentEndpoint.setPath(url.substring(baseUrl.length()));
+                    } else {
+                        currentEndpoint.setPath(url);
+                    }
+                    if (onEndpointUpdated != null) {
+                        onEndpointUpdated.run();
+                    }
+                }
+            }
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+        });
         
         sendBtn = new JButton("Send");
         sendBtn.putClientProperty("JButton.buttonType", "default");
@@ -238,19 +264,31 @@ public class EndpointDetailPanel extends JPanel {
         responseBodyPanel.repaint();
     }
 
+    private boolean isUpdatingUI = false;
+
     public void displayEndpoint(EndpointModel endpoint) {
         // Collect old data before switching
         collectDataToModel();
 
         this.currentEndpoint = endpoint;
         if (endpoint == null) {
-            methodComboBox.setSelectedItem(vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
-            urlField.setText("");
+            isUpdatingUI = true;
+            try {
+                methodComboBox.setSelectedItem(vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
+                urlField.setText("");
+            } finally {
+                isUpdatingUI = false;
+            }
             return;
         }
 
-        methodComboBox.setSelectedItem(endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
-        urlField.setText(baseUrl + endpoint.getPath());
+        isUpdatingUI = true;
+        try {
+            methodComboBox.setSelectedItem(endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
+            urlField.setText(baseUrl + endpoint.getPath());
+        } finally {
+            isUpdatingUI = false;
+        }
 
         paramPanel.setParameters(endpoint.getParameters());
         formDataPanel.setParameters(endpoint.getParameters());

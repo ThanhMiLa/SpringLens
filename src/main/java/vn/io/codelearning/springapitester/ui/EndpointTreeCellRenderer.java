@@ -38,6 +38,15 @@ public class EndpointTreeCellRenderer extends ColoredTreeCellRenderer {
             }
             
             if (endpoint.isManual()) {
+                HttpMethodEnum method = endpoint.getHttpMethod();
+                if (method == null) method = HttpMethodEnum.GET;
+
+                Color methodColor = Color.decode(method.getColorHex());
+                SimpleTextAttributes methodAttr = new SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, methodColor);
+                
+                String methodStr = String.format("%-7s", method.getLabel());
+                append(methodStr, methodAttr);
+                
                 append(endpoint.getName() != null ? endpoint.getName() : "New Request", SimpleTextAttributes.REGULAR_ATTRIBUTES);
             } else {
                 HttpMethodEnum method = endpoint.getHttpMethod();
