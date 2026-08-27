@@ -27,6 +27,8 @@ public class EndpointTreeCellRenderer extends ColoredTreeCellRenderer {
             vn.io.codelearning.springapitester.model.FolderModel folder = (vn.io.codelearning.springapitester.model.FolderModel) userObject;
             setIcon(com.intellij.icons.AllIcons.Nodes.Folder);
             append(folder.getName(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
+            // Append [+] symbol
+            append("   [+]", SimpleTextAttributes.GRAY_ATTRIBUTES);
         } else if (userObject instanceof EndpointModel) {
             // Endpoint Node
             EndpointModel endpoint = (EndpointModel) userObject;

@@ -87,20 +87,80 @@ public class EndpointTreePanel extends JPanel {
         tree.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mousePressed(java.awt.event.MouseEvent e) {
-                if (javax.swing.SwingUtilities.isRightMouseButton(e)) {
-                    int row = tree.getRowForLocation(e.getX(), e.getY());
-                    if (row != -1) {
-                        tree.setSelectionRow(row);
-                        showContextMenu(e);
-                    } else {
+                int row = tree.getRowForLocation(e.getX(), e.getY());
+                if (row == -1) {
+                    if (javax.swing.SwingUtilities.isRightMouseButton(e)) {
                         tree.clearSelection();
                         showRootContextMenu(e);
+                    }
+                    return;
+                }
+
+                if (javax.swing.SwingUtilities.isRightMouseButton(e)) {
+                    tree.setSelectionRow(row);
+                    showContextMenu(e);
+                } else if (javax.swing.SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 2) {
+                    tree.setSelectionRow(row);
+                    handleDoubleClickRename();
+                } else if (javax.swing.SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 1) {
+                    java.awt.Rectangle bounds = tree.getRowBounds(row);
+                    if (bounds != null && e.getX() > bounds.x + bounds.width - 35) {
+                        javax.swing.tree.TreePath path = tree.getPathForRow(row);
+                        if (path != null) {
+                            DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                            if (node.getUserObject() instanceof vn.io.codelearning.springapitester.model.FolderModel) {
+                                handleAddNewRequest((vn.io.codelearning.springapitester.model.FolderModel) node.getUserObject());
+                            }
+                        }
                     }
                 }
             }
         });
 
         add(new JBScrollPane(tree), BorderLayout.CENTER);
+    }
+    
+    private void handleAddNewRequest(vn.io.codelearning.springapitester.model.FolderModel folder) {
+        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        if (state != null) {
+            vn.io.codelearning.springapitester.state.EndpointSavedState newEp = new vn.io.codelearning.springapitester.state.EndpointSavedState();
+            newEp.id = java.util.UUID.randomUUID().toString();
+            newEp.name = "New Request";
+            newEp.isManual = true;
+            newEp.folderId = folder.getId();
+            newEp.httpMethod = vn.io.codelearning.springapitester.model.HttpMethodEnum.GET;
+            newEp.path = "/new-api";
+            state.manualEndpoints.add(newEp);
+            updateEndpoints(this.currentEndpoints);
+        }
+    }
+    
+    private void handleDoubleClickRename() {
+        DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
+        if (selectedNode == null) return;
+        
+        Object userObject = selectedNode.getUserObject();
+        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        
+        if (userObject instanceof vn.io.codelearning.springapitester.model.FolderModel) {
+            vn.io.codelearning.springapitester.model.FolderModel folder = (vn.io.codelearning.springapitester.model.FolderModel) userObject;
+            String newName = com.intellij.openapi.ui.Messages.showInputDialog(project, "Enter new folder name:", "Rename Folder", null, folder.getName(), null);
+            if (newName != null && !newName.trim().isEmpty()) {
+                folder.setName(newName.trim());
+                updateEndpoints(this.currentEndpoints);
+            }
+        } else if (userObject instanceof EndpointModel) {
+            EndpointModel endpoint = (EndpointModel) userObject;
+            if (endpoint.isManual()) {
+                String newName = com.intellij.openapi.ui.Messages.showInputDialog(project, "Enter new request name:", "Rename Request", null, endpoint.getName() != null ? endpoint.getName() : "New Request", null);
+                if (newName != null && !newName.trim().isEmpty()) {
+                    if (state != null) {
+                        state.manualEndpoints.stream().filter(ep -> ep.id.equals(endpoint.getId())).findFirst().ifPresent(ep -> ep.name = newName.trim());
+                    }
+                    updateEndpoints(this.currentEndpoints);
+                }
+            }
+        }
     }
 
     public void updateEndpoints(List<EndpointModel> endpoints) {
@@ -194,19 +254,7 @@ public class EndpointTreePanel extends JPanel {
             vn.io.codelearning.springapitester.model.FolderModel folder = (vn.io.codelearning.springapitester.model.FolderModel) userObject;
             
             javax.swing.JMenuItem addRequestItem = new javax.swing.JMenuItem("New Request");
-            addRequestItem.addActionListener(ev -> {
-                if (state != null) {
-                    vn.io.codelearning.springapitester.state.EndpointSavedState newEp = new vn.io.codelearning.springapitester.state.EndpointSavedState();
-                    newEp.id = java.util.UUID.randomUUID().toString();
-                    newEp.name = "New Request";
-                    newEp.isManual = true;
-                    newEp.folderId = folder.getId();
-                    newEp.httpMethod = vn.io.codelearning.springapitester.model.HttpMethodEnum.GET;
-                    newEp.path = "/new-api";
-                    state.manualEndpoints.add(newEp);
-                    updateEndpoints(this.currentEndpoints);
-                }
-            });
+            addRequestItem.addActionListener(ev -> handleAddNewRequest(folder));
             
             javax.swing.JMenuItem renameItem = new javax.swing.JMenuItem("Rename Folder");
             renameItem.addActionListener(ev -> {
