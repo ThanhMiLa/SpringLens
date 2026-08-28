@@ -93,8 +93,47 @@ public class EndpointDetailPanel extends JPanel {
             @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
         });
         
-        sendBtn = new JButton("Send");
-        sendBtn.putClientProperty("JButton.buttonType", "default");
+        sendBtn = new JButton("Send") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                Color bgColor;
+                Color textColor;
+                if (!isEnabled()) {
+                    bgColor = new Color(0x70, 0x98, 0xD4);
+                    textColor = new Color(0xDD, 0xDD, 0xDD);
+                } else if (getModel().isPressed()) {
+                    bgColor = new Color(0x09, 0x4D, 0xB5);
+                    textColor = Color.WHITE;
+                } else if (getModel().isRollover()) {
+                    bgColor = new Color(0x1C, 0x6E, 0xF2);
+                    textColor = Color.WHITE;
+                } else {
+                    bgColor = new Color(0x0C, 0x63, 0xE7); // Postman brand blue
+                    textColor = Color.WHITE;
+                }
+
+                g2.setColor(bgColor);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+
+                g2.setColor(textColor);
+                g2.setFont(getFont().deriveFont(Font.BOLD));
+                FontMetrics fm = g2.getFontMetrics();
+                int textX = (getWidth() - fm.stringWidth(getText())) / 2;
+                int textY = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+                g2.drawString(getText(), textX, textY);
+
+                g2.dispose();
+            }
+        };
+        sendBtn.setOpaque(false);
+        sendBtn.setContentAreaFilled(false);
+        sendBtn.setBorderPainted(false);
+        sendBtn.setFocusPainted(false);
+        sendBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        sendBtn.setPreferredSize(new Dimension(75, methodComboBox.getPreferredSize().height));
         sendBtn.addActionListener(e -> onSendClicked());
 
         JButton curlBtn = new JButton("cURL");
