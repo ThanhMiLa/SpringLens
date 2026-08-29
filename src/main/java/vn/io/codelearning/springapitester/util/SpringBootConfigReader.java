@@ -139,7 +139,7 @@ public class SpringBootConfigReader {
         }
     }
 
-    private static String resolvePlaceholders(String value, String defaultValue) {
+    static String resolvePlaceholders(String value, String defaultValue) {
         if (value == null) return defaultValue;
         value = value.trim();
         if (value.startsWith("${") && value.endsWith("}")) {

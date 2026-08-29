@@ -5,12 +5,27 @@ plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.intellij.platform")
     id("org.jetbrains.changelog")
+    id("jacoco")
 }
 
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
+}
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    classDirectories.setFrom(fileTree("build/tmp/instrumentCode"))
+    sourceDirectories.setFrom(files(sourceSets.main.get().allSource.srcDirs))
 }
 
 dependencies {
