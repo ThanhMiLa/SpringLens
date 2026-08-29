@@ -7,8 +7,8 @@ import java.util.Locale;
  */
 public enum HttpMethodEnum {
     GET("#28A745", "GET"),
-    POST("#007BFF", "POST"),
-    PUT("#FD7E14", "PUT"),
+    POST("#FF8C00", "POST"),
+    PUT("#007BFF", "PUT"),
     DELETE("#DC3545", "DELETE"),
     PATCH("#6F42C1", "PATCH"),
     HEAD("#6C757D", "HEAD"),

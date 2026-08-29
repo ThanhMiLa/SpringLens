@@ -74,12 +74,28 @@ public class EndpointDetailPanel extends JPanel {
         topBar.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         
         methodComboBox = new com.intellij.openapi.ui.ComboBox<>(vn.io.codelearning.springapitester.model.HttpMethodEnum.values());
-        methodComboBox.setPreferredSize(new Dimension(80, methodComboBox.getPreferredSize().height));
+        methodComboBox.setPreferredSize(new Dimension(105, methodComboBox.getPreferredSize().height));
+        methodComboBox.setRenderer(new com.intellij.ui.ColoredListCellRenderer<>() {
+            @Override
+            protected void customizeCellRenderer(@org.jetbrains.annotations.NotNull JList<? extends vn.io.codelearning.springapitester.model.HttpMethodEnum> list, vn.io.codelearning.springapitester.model.HttpMethodEnum value, int index, boolean selected, boolean hasFocus) {
+                if (value != null) {
+                    Color methodColor = Color.decode(value.getColorHex());
+                    com.intellij.ui.SimpleTextAttributes attr = new com.intellij.ui.SimpleTextAttributes(com.intellij.ui.SimpleTextAttributes.STYLE_BOLD, methodColor);
+                    append(value.getLabel(), attr);
+                }
+            }
+        });
+        updateMethodComboColor(vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
+
         methodComboBox.addItemListener(e -> {
-            if (!isUpdatingUI && e.getStateChange() == java.awt.event.ItemEvent.SELECTED && currentEndpoint != null) {
-                currentEndpoint.setHttpMethod((vn.io.codelearning.springapitester.model.HttpMethodEnum) e.getItem());
-                if (onEndpointUpdated != null) {
-                    onEndpointUpdated.run();
+            if (e.getStateChange() == java.awt.event.ItemEvent.SELECTED) {
+                vn.io.codelearning.springapitester.model.HttpMethodEnum method = (vn.io.codelearning.springapitester.model.HttpMethodEnum) e.getItem();
+                updateMethodComboColor(method);
+                if (!isUpdatingUI && currentEndpoint != null) {
+                    currentEndpoint.setHttpMethod(method);
+                    if (onEndpointUpdated != null) {
+                        onEndpointUpdated.run();
+                    }
                 }
             }
         });
@@ -361,7 +377,10 @@ public class EndpointDetailPanel extends JPanel {
 
         isUpdatingUI = true;
         try {
-            methodComboBox.setSelectedItem(endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
+            vn.io.codelearning.springapitester.model.HttpMethodEnum method = endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET;
+            methodComboBox.setSelectedItem(method);
+            updateMethodComboColor(method);
+
             String effectiveBaseUrl = getEffectiveBaseUrl(endpoint);
             String fullUrl = effectiveBaseUrl + endpoint.getPath();
             urlField.setText(fullUrl.replace("//", "/").replace("http:/l", "http://l").replace("https:/l", "https://l"));
@@ -598,5 +617,14 @@ public class EndpointDetailPanel extends JPanel {
             }
         }
         return endpoint.getDirectBaseUrl() != null ? endpoint.getDirectBaseUrl() : baseUrl;
+    }
+
+    private void updateMethodComboColor(vn.io.codelearning.springapitester.model.HttpMethodEnum method) {
+        if (method != null && methodComboBox != null) {
+            Color color = Color.decode(method.getColorHex());
+            methodComboBox.setForeground(color);
+            methodComboBox.setFont(methodComboBox.getFont().deriveFont(Font.BOLD, 12f));
+            methodComboBox.repaint();
+        }
     }
 }
