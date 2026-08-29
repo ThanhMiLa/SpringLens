@@ -18,12 +18,11 @@ public class HttpRequestBuilder {
     public static Request buildRequest(EndpointModel endpoint, String fullUrlPattern) {
         String urlPath = fullUrlPattern;
 
-        // 1. Thay thế Path Variables
+        // 1. Thay thế Path Variables (hỗ trợ cả pattern regex)
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
-                // Thay thế cả ở URL path
                 String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
-                urlPath = urlPath.replace("{" + param.getName() + "}", value);
+                urlPath = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
             }
         }
 

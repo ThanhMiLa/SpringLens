@@ -64,4 +64,29 @@ public final class SpringUrlUtils {
         }
         return result;
     }
+
+    /**
+     * Thay thế một Path Variable trong URL (hỗ trợ cả pattern có regex như {id:[0-9]+}).
+     */
+    public static String replacePathVariable(String url, String paramName, String value) {
+        if (url == null || paramName == null) return url;
+        String val = value != null ? value : "";
+        String pattern = "\\{" + Pattern.quote(paramName) + "(?::[^}]+)?\\}";
+        return url.replaceAll(pattern, Matcher.quoteReplacement(val));
+    }
+
+    /**
+     * Kiểm tra xem URL còn chứa Path Variable nào chưa được điền giá trị hay không.
+     */
+    public static boolean hasUnresolvedPathVariables(String url) {
+        if (url == null || url.isBlank()) return false;
+        return PATH_VARIABLE_PATTERN.matcher(url).find();
+    }
+
+    /**
+     * Lấy danh sách các Path Variable chưa được thay thế trong URL.
+     */
+    public static List<String> getUnresolvedPathVariables(String url) {
+        return extractPathVariableNames(url);
+    }
 }

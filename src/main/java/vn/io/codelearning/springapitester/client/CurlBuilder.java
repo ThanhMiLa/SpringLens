@@ -19,12 +19,12 @@ public class CurlBuilder {
             curl.append(" -X ").append(endpoint.getHttpMethod().name());
         }
 
-        // Build URL
+        // Build URL (hỗ trợ cả pattern regex)
         String urlPath = fullUrlPattern;
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
                 String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
-                urlPath = urlPath.replace("{" + param.getName() + "}", value);
+                urlPath = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
             }
         }
         

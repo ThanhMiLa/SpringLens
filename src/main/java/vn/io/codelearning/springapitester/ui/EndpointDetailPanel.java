@@ -13,6 +13,8 @@ import vn.io.codelearning.springapitester.client.HttpClientService;
 import vn.io.codelearning.springapitester.client.HttpRequestBuilder;
 import vn.io.codelearning.springapitester.generator.DtoJsonGenerator;
 import vn.io.codelearning.springapitester.model.EndpointModel;
+import vn.io.codelearning.springapitester.model.ParameterModel;
+import vn.io.codelearning.springapitester.model.ParamTypeEnum;
 
 import javax.swing.*;
 import java.awt.*;
@@ -43,6 +45,7 @@ public class EndpointDetailPanel extends JPanel {
     private final JBLabel statusLabel;
     private final JTextArea responseHeadersArea;
     private JToggleButton wrapToggleBtn;
+    private JBTabbedPane requestTabs;
 
     // Default local base URL for testing
     private String baseUrl;
@@ -175,7 +178,7 @@ public class EndpointDetailPanel extends JPanel {
         mainSplitter.setShowDividerIcon(true);
         
         // --- 2.1 Request Tabs ---
-        JBTabbedPane requestTabs = new JBTabbedPane();
+        requestTabs = new JBTabbedPane();
         paramPanel = new ParamTablePanel(java.util.List.of(
             vn.io.codelearning.springapitester.model.ParamTypeEnum.PATH_VARIABLE,
             vn.io.codelearning.springapitester.model.ParamTypeEnum.QUERY_PARAM
@@ -469,12 +472,39 @@ public class EndpointDetailPanel extends JPanel {
         if (currentEndpoint == null) return;
         collectDataToModel();
 
+        String fullUrl = urlField.getText();
+        
+        // Validate Path Variables: Check if any unpopulated path variables remain
+        String testUrl = fullUrl;
+        if (currentEndpoint.getParameters() != null) {
+            for (ParameterModel param : currentEndpoint.getParameters()) {
+                if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
+                    String val = param.getCurrentValue() != null ? param.getCurrentValue().trim() : "";
+                    if (!val.isEmpty()) {
+                        testUrl = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(testUrl, param.getName(), val);
+                    }
+                }
+            }
+        }
+        
+        if (vn.io.codelearning.springapitester.scanner.SpringUrlUtils.hasUnresolvedPathVariables(testUrl)) {
+            java.util.List<String> missing = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.getUnresolvedPathVariables(testUrl);
+            String missingNames = String.join(", ", missing);
+            JOptionPane.showMessageDialog(this, 
+                "Please fill in value for Path Variable: {" + missingNames + "} in the Params tab before sending.",
+                "Missing Path Variable", 
+                JOptionPane.WARNING_MESSAGE);
+            if (requestTabs != null) {
+                requestTabs.setSelectedIndex(0); // Switch to Params tab
+            }
+            return;
+        }
+
         sendBtn.setEnabled(false);
         statusLabel.setText("Sending...");
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             try {
-                String fullUrl = urlField.getText();
                 Request request = HttpRequestBuilder.buildRequest(currentEndpoint, fullUrl);
                 
                 HttpClientService.getInstance().executeAsync(request).thenAccept(response -> {

@@ -7,6 +7,9 @@ import com.google.gson.JsonParser;
 import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
 
+import javax.net.ssl.*;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +28,13 @@ public class HttpClientService {
 
     private HttpClientService() {
         this.cookieJar = new InMemoryCookieJar();
+        
+        X509TrustManager trustManager = createUnsafeTrustManager();
+        SSLSocketFactory sslSocketFactory = createUnsafeSslSocketFactory(trustManager);
+
         this.client = new OkHttpClient.Builder()
+                .sslSocketFactory(sslSocketFactory, trustManager)
+                .hostnameVerifier((hostname, session) -> true)
                 .cookieJar(cookieJar)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -33,6 +42,31 @@ public class HttpClientService {
                 .retryOnConnectionFailure(true)
                 .build();
         this.gson = new GsonBuilder().setPrettyPrinting().create();
+    }
+
+    private static X509TrustManager createUnsafeTrustManager() {
+        return new X509TrustManager() {
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {}
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {}
+
+            @Override
+            public X509Certificate[] getAcceptedIssuers() {
+                return new X509Certificate[0];
+            }
+        };
+    }
+
+    private static SSLSocketFactory createUnsafeSslSocketFactory(X509TrustManager trustManager) {
+        try {
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new TrustManager[]{trustManager}, new java.security.SecureRandom());
+            return sslContext.getSocketFactory();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create unsafe SSL socket factory", e);
+        }
     }
 
     public static synchronized HttpClientService getInstance() {
