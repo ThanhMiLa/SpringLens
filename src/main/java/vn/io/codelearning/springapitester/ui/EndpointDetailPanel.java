@@ -42,6 +42,7 @@ public class EndpointDetailPanel extends JPanel {
     
     private final JBLabel statusLabel;
     private final JTextArea responseHeadersArea;
+    private JToggleButton wrapToggleBtn;
 
     // Default local base URL for testing
     private String baseUrl;
@@ -261,8 +262,20 @@ public class EndpointDetailPanel extends JPanel {
         statusLabel = new JBLabel("Ready");
         statusBar.add(statusLabel, BorderLayout.WEST);
         
-        // Toolbar for Response (Language Dropdown)
-        JPanel responseToolbar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        // Toolbar for Response (Language Dropdown & Wrap Toggle)
+        JPanel responseToolbar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        
+        wrapToggleBtn = new JToggleButton("Wrap", true);
+        wrapToggleBtn.setToolTipText("Toggle Soft Wrap / Word Wrap (Postman UX)");
+        wrapToggleBtn.setPreferredSize(new Dimension(65, 24));
+        wrapToggleBtn.addActionListener(e -> {
+            boolean isWrap = wrapToggleBtn.isSelected();
+            if (responseBodyEditor != null && !responseBodyEditor.isDisposed()) {
+                responseBodyEditor.getSettings().setUseSoftWraps(isWrap);
+            }
+        });
+        responseToolbar.add(wrapToggleBtn);
+
         responseLanguageCombo = new com.intellij.openapi.ui.ComboBox<>(new String[]{"JSON", "HTML", "XML", "TEXT"});
         responseLanguageCombo.setSelectedItem("JSON");
         responseLanguageCombo.addActionListener(e -> changeResponseLanguage());
@@ -279,6 +292,8 @@ public class EndpointDetailPanel extends JPanel {
         
         responseHeadersArea = new JTextArea();
         responseHeadersArea.setEditable(false);
+        responseHeadersArea.setLineWrap(true);
+        responseHeadersArea.setWrapStyleWord(true);
 
         responseTabs.addTab("Response Body", responseBodyPanel);
         responseTabs.addTab("Response Headers", new JScrollPane(responseHeadersArea));
@@ -308,6 +323,9 @@ public class EndpointDetailPanel extends JPanel {
         
         // Create new editor with new highlighting
         responseBodyEditor = CodeEditorUtil.createEditor(project, currentText, ext, true);
+        if (wrapToggleBtn != null) {
+            responseBodyEditor.getSettings().setUseSoftWraps(wrapToggleBtn.isSelected());
+        }
         
         // Update Panel
         responseBodyPanel.removeAll();

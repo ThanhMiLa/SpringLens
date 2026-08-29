@@ -42,6 +42,7 @@ public class JsonEditorFactory {
         settings.setLineMarkerAreaShown(false);
         settings.setIndentGuidesShown(true);
         settings.setAdditionalPageAtBottom(false);
+        settings.setUseSoftWraps(true);
 
         return editor;
     }

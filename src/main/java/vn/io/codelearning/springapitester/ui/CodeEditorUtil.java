@@ -36,7 +36,7 @@ public class CodeEditorUtil {
             editor = factory.createEditor(document, project, fileType, false);
         }
 
-        // 4. Cấu hình giao diện (số dòng, gập code)
+        // 4. Cấu hình giao diện (số dòng, gập code, tự động ngắt dòng như Postman)
         EditorSettings settings = editor.getSettings();
         settings.setLineNumbersShown(true);
         settings.setFoldingOutlineShown(true);
@@ -44,6 +44,7 @@ public class CodeEditorUtil {
         settings.setLineMarkerAreaShown(false);
         settings.setIndentGuidesShown(true);
         settings.setAdditionalPageAtBottom(false);
+        settings.setUseSoftWraps(true);
 
         return editor;
     }
