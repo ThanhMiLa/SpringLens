@@ -15,23 +15,25 @@ public class AuthPanel extends JPanel {
     private final CardLayout cardLayout;
     
     private java.util.function.Consumer<Boolean> onSecurityToggled;
+    private java.util.function.Consumer<AuthConfig> onApplyToAllClicked;
 
     // Bearer fields
-    private final JTextField bearerTokenField;
+    private final com.intellij.ui.components.JBTextField bearerTokenField;
 
     // Basic fields
-    private final JTextField basicUserField;
+    private final com.intellij.ui.components.JBTextField basicUserField;
     private final JPasswordField basicPassField;
 
     // API Key fields
-    private final JTextField apiKeyNameField;
-    private final JTextField apiKeyValueField;
+    private final com.intellij.ui.components.JBTextField apiKeyNameField;
+    private final com.intellij.ui.components.JBTextField apiKeyValueField;
     private final JCheckBox apiKeyInHeaderCheck;
 
     private AuthConfig currentConfig;
 
     public AuthPanel() {
-        setLayout(new BorderLayout(5, 5));
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         // Combo Box
         authTypeCombo = new ComboBox<>(AuthTypeEnum.values());
@@ -42,55 +44,127 @@ public class AuthPanel extends JPanel {
                 onSecurityToggled.accept(isSecuredCheck.isSelected());
             }
         });
+
+        JButton applyToAllBtn = new JButton("Apply to All APIs");
+        applyToAllBtn.setToolTipText("Copy this Auth config to all other APIs in project");
+        applyToAllBtn.addActionListener(e -> {
+            if (onApplyToAllClicked != null) {
+                onApplyToAllClicked.accept(getAuthConfig());
+                JOptionPane.showMessageDialog(this, "Authentication config applied to all APIs successfully!", "Apply to All", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+
+        // Top Controls Panel (Vertical stack)
+        JPanel topPanel = new JPanel();
+        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
         
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
-        topPanel.add(isSecuredCheck);
+        JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        row1.add(isSecuredCheck);
+        row1.setAlignmentX(Component.LEFT_ALIGNMENT);
         
-        JPanel typePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
-        typePanel.add(new JLabel("Auth Type:"));
-        typePanel.add(authTypeCombo);
-        topPanel.add(typePanel);
+        JPanel row2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        row2.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
+        row2.add(new JLabel("Type:"));
+        row2.add(authTypeCombo);
+        row2.add(Box.createHorizontalStrut(10));
+        row2.add(applyToAllBtn);
+        row2.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        topPanel.add(row1);
+        topPanel.add(row2);
+        topPanel.add(new JSeparator(SwingConstants.HORIZONTAL));
         
         add(topPanel, BorderLayout.NORTH);
 
         // Card Layout for dynamic forms
         cardLayout = new CardLayout();
         cardsPanel = new JPanel(cardLayout);
+        cardsPanel.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
 
         // Card 1: No Auth / Inherit
-        cardsPanel.add(new JPanel(), AuthTypeEnum.NO_AUTH.name());
-        cardsPanel.add(new JPanel(), AuthTypeEnum.INHERIT.name());
+        JPanel noAuthPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        noAuthPanel.add(new JLabel("This endpoint does not require authorization headers."));
+        cardsPanel.add(noAuthPanel, AuthTypeEnum.NO_AUTH.name());
+
+        JPanel inheritPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        inheritPanel.add(new JLabel("Inherit authentication from parent environment or project defaults."));
+        cardsPanel.add(inheritPanel, AuthTypeEnum.INHERIT.name());
 
         // Card 2: Bearer Token
-        JPanel bearerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        bearerTokenField = new JTextField(30);
-        bearerPanel.add(new JLabel("Token:"));
-        bearerPanel.add(bearerTokenField);
+        JPanel bearerPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0; gbc.fill = GridBagConstraints.NONE;
+        bearerPanel.add(new JLabel("Token:"), gbc);
+        
+        gbc.gridx = 1; gbc.gridy = 0; gbc.weightx = 1.0; gbc.fill = GridBagConstraints.HORIZONTAL;
+        bearerTokenField = new com.intellij.ui.components.JBTextField();
+        bearerTokenField.getEmptyText().setText("Paste Bearer JWT token here...");
+        bearerPanel.add(bearerTokenField, gbc);
+        
+        // Filler to push everything to top
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weighty = 1.0; gbc.fill = GridBagConstraints.BOTH;
+        bearerPanel.add(new JPanel(), gbc);
+        
         cardsPanel.add(bearerPanel, AuthTypeEnum.BEARER_TOKEN.name());
 
         // Card 3: Basic Auth
-        JPanel basicPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        basicUserField = new JTextField(15);
-        basicPassField = new JPasswordField(15);
-        basicPanel.add(new JLabel("Username:"));
-        basicPanel.add(basicUserField);
-        basicPanel.add(new JLabel("Password:"));
-        basicPanel.add(basicPassField);
+        JPanel basicPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints bGbc = new GridBagConstraints();
+        bGbc.insets = new Insets(4, 4, 4, 4);
+        bGbc.anchor = GridBagConstraints.WEST;
+        
+        bGbc.gridx = 0; bGbc.gridy = 0; bGbc.weightx = 0; bGbc.fill = GridBagConstraints.NONE;
+        basicPanel.add(new JLabel("Username:"), bGbc);
+        
+        bGbc.gridx = 1; bGbc.gridy = 0; bGbc.weightx = 1.0; bGbc.fill = GridBagConstraints.HORIZONTAL;
+        basicUserField = new com.intellij.ui.components.JBTextField();
+        basicPanel.add(basicUserField, bGbc);
+        
+        bGbc.gridx = 0; bGbc.gridy = 1; bGbc.weightx = 0; bGbc.fill = GridBagConstraints.NONE;
+        basicPanel.add(new JLabel("Password:"), bGbc);
+        
+        bGbc.gridx = 1; bGbc.gridy = 1; bGbc.weightx = 1.0; bGbc.fill = GridBagConstraints.HORIZONTAL;
+        basicPassField = new JPasswordField();
+        basicPanel.add(basicPassField, bGbc);
+        
+        bGbc.gridx = 0; bGbc.gridy = 2; bGbc.gridwidth = 2; bGbc.weighty = 1.0; bGbc.fill = GridBagConstraints.BOTH;
+        basicPanel.add(new JPanel(), bGbc);
+        
         cardsPanel.add(basicPanel, AuthTypeEnum.BASIC_AUTH.name());
 
         // Card 4: API Key
-        JPanel apiPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        apiKeyNameField = new JTextField(10);
-        apiKeyValueField = new JTextField(20);
-        apiKeyInHeaderCheck = new JCheckBox("Add to Header", true);
-        apiPanel.add(new JLabel("Key:"));
-        apiPanel.add(apiKeyNameField);
-        apiPanel.add(new JLabel("Value:"));
-        apiPanel.add(apiKeyValueField);
-        apiPanel.add(apiKeyInHeaderCheck);
+        JPanel apiPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints aGbc = new GridBagConstraints();
+        aGbc.insets = new Insets(4, 4, 4, 4);
+        aGbc.anchor = GridBagConstraints.WEST;
+        
+        aGbc.gridx = 0; aGbc.gridy = 0; aGbc.weightx = 0; aGbc.fill = GridBagConstraints.NONE;
+        apiPanel.add(new JLabel("Key:"), aGbc);
+        
+        aGbc.gridx = 1; aGbc.gridy = 0; aGbc.weightx = 1.0; aGbc.fill = GridBagConstraints.HORIZONTAL;
+        apiKeyNameField = new com.intellij.ui.components.JBTextField();
+        apiPanel.add(apiKeyNameField, aGbc);
+        
+        aGbc.gridx = 0; aGbc.gridy = 1; aGbc.weightx = 0; aGbc.fill = GridBagConstraints.NONE;
+        apiPanel.add(new JLabel("Value:"), aGbc);
+        
+        aGbc.gridx = 1; aGbc.gridy = 1; aGbc.weightx = 1.0; aGbc.fill = GridBagConstraints.HORIZONTAL;
+        apiKeyValueField = new com.intellij.ui.components.JBTextField();
+        apiPanel.add(apiKeyValueField, aGbc);
+        
+        aGbc.gridx = 1; aGbc.gridy = 2; aGbc.weightx = 1.0; aGbc.fill = GridBagConstraints.HORIZONTAL;
+        apiKeyInHeaderCheck = new JCheckBox("Add to Header (otherwise Query Params)", true);
+        apiPanel.add(apiKeyInHeaderCheck, aGbc);
+        
+        aGbc.gridx = 0; aGbc.gridy = 3; aGbc.gridwidth = 2; aGbc.weighty = 1.0; aGbc.fill = GridBagConstraints.BOTH;
+        apiPanel.add(new JPanel(), aGbc);
+        
         cardsPanel.add(apiPanel, AuthTypeEnum.API_KEY.name());
 
-        add(cardsPanel, BorderLayout.CENTER);
+        add(new com.intellij.ui.components.JBScrollPane(cardsPanel), BorderLayout.CENTER);
 
         // Switch Card on Selection
         authTypeCombo.addItemListener(e -> {
@@ -134,5 +208,9 @@ public class AuthPanel extends JPanel {
         currentConfig.setApiKeyInHeader(apiKeyInHeaderCheck.isSelected());
 
         return currentConfig;
+    }
+
+    public void setOnApplyToAllClicked(java.util.function.Consumer<AuthConfig> onApplyToAllClicked) {
+        this.onApplyToAllClicked = onApplyToAllClicked;
     }
 }

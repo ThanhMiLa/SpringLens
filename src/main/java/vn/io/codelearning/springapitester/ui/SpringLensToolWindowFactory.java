@@ -58,6 +58,26 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
             detailPanel.refreshEndpoint();
         });
 
+        detailPanel.setOnApplyToAllAuth(authConfig -> {
+            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+            if (state != null) {
+                // Apply to currently scanned endpoints in memory
+                if (endpoints != null) {
+                    for (EndpointModel ep : endpoints) {
+                        ep.setAuthConfig(authConfig.cloneConfig());
+                        state.saveEndpoint(ep);
+                    }
+                }
+                // Apply to all stored endpoints in state
+                for (vn.io.codelearning.springapitester.state.EndpointSavedState storedEp : state.endpoints.values()) {
+                    storedEp.authConfig = authConfig.cloneConfig();
+                }
+                for (vn.io.codelearning.springapitester.state.EndpointSavedState storedManualEp : state.manualEndpoints) {
+                    storedManualEp.authConfig = authConfig.cloneConfig();
+                }
+            }
+        });
+
         mainSplitter.setFirstComponent(treePanelHolder[0]);
         mainSplitter.setSecondComponent(detailPanel);
         

@@ -47,9 +47,16 @@ public class EndpointDetailPanel extends JPanel {
     private String baseUrl;
     
     private Runnable onEndpointUpdated;
-    
+    private java.util.function.Consumer<vn.io.codelearning.springapitester.model.AuthConfig> onApplyToAllAuth;
+
+    private boolean isUpdatingUI = false;
+
     public void setOnEndpointUpdated(Runnable onEndpointUpdated) {
         this.onEndpointUpdated = onEndpointUpdated;
+    }
+
+    public void setOnApplyToAllAuth(java.util.function.Consumer<vn.io.codelearning.springapitester.model.AuthConfig> onApplyToAllAuth) {
+        this.onApplyToAllAuth = onApplyToAllAuth;
     }
 
     public EndpointDetailPanel(Project project) {
@@ -182,6 +189,11 @@ public class EndpointDetailPanel extends JPanel {
                 }
             }
         });
+        authPanel.setOnApplyToAllClicked(authConfig -> {
+            if (onApplyToAllAuth != null) {
+                onApplyToAllAuth.accept(authConfig);
+            }
+        });
         
         // Request Body with Toolbar
         requestBodyPanel = new JPanel(new BorderLayout());
@@ -303,8 +315,6 @@ public class EndpointDetailPanel extends JPanel {
         responseBodyPanel.revalidate();
         responseBodyPanel.repaint();
     }
-
-    private boolean isUpdatingUI = false;
 
     public void refreshEndpoint() {
         if (currentEndpoint != null) {

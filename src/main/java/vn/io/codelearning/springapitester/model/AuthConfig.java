@@ -98,4 +98,16 @@ public class AuthConfig {
     public int hashCode() {
         return Objects.hash(authType, bearerToken, username, password, apiKeyName, apiKeyValue, apiKeyInHeader);
     }
+    
+    public AuthConfig cloneConfig() {
+        AuthConfig clone = new AuthConfig();
+        clone.setAuthType(this.authType);
+        clone.setBearerToken(this.bearerToken);
+        clone.setUsername(this.username);
+        clone.setPassword(this.password);
+        clone.setApiKeyName(this.apiKeyName);
+        clone.setApiKeyValue(this.apiKeyValue);
+        clone.setApiKeyInHeader(this.apiKeyInHeader);
+        return clone;
+    }
 }
