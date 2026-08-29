@@ -52,6 +52,33 @@ public class SpringEndpointScanner {
             List<String> classPaths = extractClassBasePaths(controllerClass);
             boolean classIsRest = SpringAnnotationUtils.isRestController(controllerClass);
 
+            // Determine module and base URL
+            com.intellij.openapi.module.Module module = com.intellij.openapi.module.ModuleUtilCore.findModuleForPsiElement(controllerClass);
+            String moduleName = "Unknown";
+            String directBaseUrl = "http://localhost:8080";
+            if (module != null) {
+                String rawName = module.getName();
+                moduleName = rawName.endsWith(".main") ? rawName.substring(0, rawName.length() - 5) : rawName;
+                
+                // Try to get folder name from content roots
+                com.intellij.openapi.vfs.VirtualFile[] contentRoots = com.intellij.openapi.roots.ModuleRootManager.getInstance(module).getContentRoots();
+                if (contentRoots.length > 0) {
+                    moduleName = contentRoots[0].getName();
+                }
+                
+                vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig config = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project, module);
+                directBaseUrl = config.baseUrl;
+                if (config.appName != null && !config.appName.isEmpty()) {
+                    moduleName = config.appName;
+                }
+            } else {
+                vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig config = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project);
+                directBaseUrl = config.baseUrl;
+                if (config.appName != null && !config.appName.isEmpty()) {
+                    moduleName = config.appName;
+                }
+            }
+
             // Dùng getAllMethods() để bắt cả method từ Interface/Class cha, lọc trùng bằng signature
             Set<String> processedSignatures = new HashSet<>();
 
@@ -68,11 +95,16 @@ public class SpringEndpointScanner {
                 processedSignatures.add(signature);
 
                 List<EndpointModel> methodEndpoints = processMethod(method, controllerClass, classPaths, packageName, controllerName, classIsRest);
+                for (EndpointModel ep : methodEndpoints) {
+                    ep.setModuleName(moduleName);
+                    ep.setDirectBaseUrl(directBaseUrl);
+                }
                 result.addAll(methodEndpoints);
             }
         }
 
-        result.sort(Comparator.comparing(EndpointModel::getPackageName)
+        result.sort(Comparator.comparing(EndpointModel::getModuleName, Comparator.nullsFirst(String::compareTo))
+                .thenComparing(EndpointModel::getPackageName)
                 .thenComparing(EndpointModel::getControllerName)
                 .thenComparing(EndpointModel::getPath));
 

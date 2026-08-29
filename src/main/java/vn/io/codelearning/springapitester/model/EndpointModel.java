@@ -29,6 +29,8 @@ public class EndpointModel {
     private String returnTypeClassFqn;    // Kiểu trả về của hàm (vd: ResponseEntity<UserDTO>)
     private String expectedResponseJson;  // JSON mẫu dự kiến sinh từ DTO trả về
     private AuthConfig authConfig;
+    private String moduleName;            // Service chứa endpoint
+    private String directBaseUrl;         // URL gọi trực tiếp (http://localhost:8081)
 
     public EndpointModel() {
         this.id = UUID.randomUUID().toString();
@@ -272,4 +274,20 @@ public class EndpointModel {
     
     public String getFolderId() { return folderId; }
     public void setFolderId(String folderId) { this.folderId = folderId; }
+
+    public String getModuleName() {
+        return moduleName;
+    }
+
+    public void setModuleName(String moduleName) {
+        this.moduleName = moduleName;
+    }
+
+    public String getDirectBaseUrl() {
+        return directBaseUrl;
+    }
+
+    public void setDirectBaseUrl(String directBaseUrl) {
+        this.directBaseUrl = directBaseUrl;
+    }
 }

@@ -21,6 +21,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     // Module 7: Manual structures
     public java.util.List<vn.io.codelearning.springapitester.model.FolderModel> manualFolders = new java.util.ArrayList<>();
     public java.util.List<EndpointSavedState> manualEndpoints = new java.util.ArrayList<>();
+    public boolean gatewayModeEnabled = false;
 
     public static SpringLensState getInstance(Project project) {
         return project.getService(SpringLensState.class);
@@ -35,6 +36,13 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     @Override
     public void loadState(@NotNull SpringLensState state) {
         this.endpoints = state.endpoints;
+        if (state.manualFolders != null) {
+            this.manualFolders = state.manualFolders;
+        }
+        if (state.manualEndpoints != null) {
+            this.manualEndpoints = state.manualEndpoints;
+        }
+        this.gatewayModeEnabled = state.gatewayModeEnabled;
     }
 
     public String getEndpointKey(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {

@@ -26,7 +26,9 @@ public class EndpointTreePanel extends JPanel {
 
     private List<EndpointModel> currentEndpoints;
     private final Consumer<EndpointModel> onEndpointSelected;
-    private final Runnable onReloadClicked;
+    private Runnable onReloadClicked;
+    private Runnable onModeChanged;
+    private com.intellij.openapi.ui.ComboBox<String> gatewayComboBox;
 
     public EndpointTreePanel(Project project, Consumer<EndpointModel> onEndpointSelected, Runnable onReloadClicked) {
         this.project = project;
@@ -64,7 +66,28 @@ public class EndpointTreePanel extends JPanel {
         actionPanel.add(reloadBtn);
         
         topPanel.add(actionPanel, BorderLayout.EAST);
-        add(topPanel, BorderLayout.NORTH);
+        
+        gatewayComboBox = new com.intellij.openapi.ui.ComboBox<>(new String[]{"🎯 Direct Services", "🌐 API Gateway"});
+        gatewayComboBox.setVisible(false);
+        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        if (state != null) {
+            gatewayComboBox.setSelectedIndex(state.gatewayModeEnabled ? 1 : 0);
+        }
+        
+        gatewayComboBox.addActionListener(e -> {
+            if (state != null) {
+                state.gatewayModeEnabled = (gatewayComboBox.getSelectedIndex() == 1);
+            }
+            if (onModeChanged != null) {
+                onModeChanged.run();
+            }
+        });
+        
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.add(topPanel, BorderLayout.NORTH);
+        headerPanel.add(gatewayComboBox, BorderLayout.SOUTH);
+        
+        add(headerPanel, BorderLayout.NORTH);
 
         // 2. Tree
         rootNode = new DefaultMutableTreeNode("APIs");
@@ -163,6 +186,10 @@ public class EndpointTreePanel extends JPanel {
         }
     }
 
+    public void setOnModeChanged(Runnable onModeChanged) {
+        this.onModeChanged = onModeChanged;
+    }
+
     public void updateEndpoints(List<EndpointModel> endpoints) {
         this.currentEndpoints = endpoints;
         rootNode.removeAllChildren();
@@ -201,19 +228,58 @@ public class EndpointTreePanel extends JPanel {
         }
 
         // 2. Build Scanned Controllers
-        if (endpoints != null) {
-            Map<String, List<EndpointModel>> grouped = endpoints.stream()
-                    .collect(Collectors.groupingBy(e -> 
-                        (e.getControllerName() != null && !e.getControllerName().isEmpty()) ? e.getControllerName() : "Unknown"
-                    ));
-
-            for (Map.Entry<String, List<EndpointModel>> entry : grouped.entrySet()) {
-                DefaultMutableTreeNode controllerNode = new DefaultMutableTreeNode(entry.getKey());
-                for (EndpointModel ep : entry.getValue()) {
-                    DefaultMutableTreeNode epNode = new DefaultMutableTreeNode(ep);
-                    controllerNode.add(epNode);
+        if (endpoints != null && !endpoints.isEmpty()) {
+            com.intellij.openapi.module.Module[] modules = com.intellij.openapi.module.ModuleManager.getInstance(project).getModules();
+            boolean hasGateway = false;
+            for (com.intellij.openapi.module.Module m : modules) {
+                if (vn.io.codelearning.springapitester.util.GatewayConfigReader.hasGatewayDependency(m)) {
+                    hasGateway = true; break;
                 }
-                rootNode.add(controllerNode);
+            }
+            
+            if (gatewayComboBox != null) {
+                gatewayComboBox.setVisible(hasGateway);
+            }
+            
+            java.util.Set<String> moduleNames = endpoints.stream().map(e -> e.getModuleName() != null ? e.getModuleName() : "Unknown").collect(Collectors.toSet());
+            boolean useModuleLevel = moduleNames.size() > 1 || hasGateway;
+
+            if (useModuleLevel) {
+                Map<String, List<EndpointModel>> moduleGrouped = endpoints.stream()
+                        .collect(Collectors.groupingBy(e -> e.getModuleName() != null ? e.getModuleName() : "Unknown"));
+                
+                for (Map.Entry<String, List<EndpointModel>> modEntry : moduleGrouped.entrySet()) {
+                    String modName = modEntry.getKey();
+                    String directUrl = modEntry.getValue().isEmpty() ? "" : modEntry.getValue().get(0).getDirectBaseUrl();
+                    vn.io.codelearning.springapitester.model.ServiceModel service = new vn.io.codelearning.springapitester.model.ServiceModel(modName, directUrl, false);
+                    DefaultMutableTreeNode moduleNode = new DefaultMutableTreeNode(service);
+                    
+                    Map<String, List<EndpointModel>> ctrlGrouped = modEntry.getValue().stream()
+                            .collect(Collectors.groupingBy(e -> (e.getControllerName() != null && !e.getControllerName().isEmpty()) ? e.getControllerName() : "Unknown"));
+                    
+                    for (Map.Entry<String, List<EndpointModel>> ctrlEntry : ctrlGrouped.entrySet()) {
+                        DefaultMutableTreeNode ctrlNode = new DefaultMutableTreeNode(ctrlEntry.getKey());
+                        for (EndpointModel ep : ctrlEntry.getValue()) {
+                            ctrlNode.add(new DefaultMutableTreeNode(ep));
+                        }
+                        moduleNode.add(ctrlNode);
+                    }
+                    rootNode.add(moduleNode);
+                }
+            } else {
+                Map<String, List<EndpointModel>> grouped = endpoints.stream()
+                        .collect(Collectors.groupingBy(e -> 
+                            (e.getControllerName() != null && !e.getControllerName().isEmpty()) ? e.getControllerName() : "Unknown"
+                        ));
+    
+                for (Map.Entry<String, List<EndpointModel>> entry : grouped.entrySet()) {
+                    DefaultMutableTreeNode controllerNode = new DefaultMutableTreeNode(entry.getKey());
+                    for (EndpointModel ep : entry.getValue()) {
+                        DefaultMutableTreeNode epNode = new DefaultMutableTreeNode(ep);
+                        controllerNode.add(epNode);
+                    }
+                    rootNode.add(controllerNode);
+                }
             }
         }
         

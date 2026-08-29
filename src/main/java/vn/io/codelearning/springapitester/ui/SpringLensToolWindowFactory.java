@@ -53,6 +53,10 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                 treePanelHolder[0].updateEndpoints(endpoints);
             }
         );
+        
+        treePanelHolder[0].setOnModeChanged(() -> {
+            detailPanel.refreshEndpoint();
+        });
 
         mainSplitter.setFirstComponent(treePanelHolder[0]);
         mainSplitter.setSecondComponent(detailPanel);

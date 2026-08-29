@@ -10,26 +10,53 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
+import java.util.List;
+import java.util.ArrayList;
 
 public class SpringBootConfigReader {
 
     /**
      * Tìm port và context-path từ các file cấu hình (application.yaml, application.yml, application.properties).
-     * Trả về Base URL mẫu: http://localhost:8080/context-path
      */
+    public static class AppConfig {
+        public String baseUrl;
+        public String appName;
+        public AppConfig(String baseUrl, String appName) {
+            this.baseUrl = baseUrl;
+            this.appName = appName;
+        }
+    }
+
+    public static AppConfig extractAppConfig(Project project) {
+        return extractConfigFromScope(project, GlobalSearchScope.projectScope(project));
+    }
+
+    public static AppConfig extractAppConfig(Project project, com.intellij.openapi.module.Module module) {
+        if (module == null) return extractAppConfig(project);
+        GlobalSearchScope scope = GlobalSearchScope.moduleRuntimeScope(module, false);
+        return extractConfigFromScope(project, scope);
+    }
+    
     public static String extractBaseUrl(Project project) {
+        return extractAppConfig(project).baseUrl;
+    }
+
+    public static String extractBaseUrl(Project project, com.intellij.openapi.module.Module module) {
+        return extractAppConfig(project, module).baseUrl;
+    }
+
+    private static AppConfig extractConfigFromScope(Project project, GlobalSearchScope scope) {
         String[] port = {"8080"};
         String[] contextPath = {""};
+        String[] appName = {""};
 
-        // Tìm tất cả các file có tên application*
-        GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
         Collection<VirtualFile> ymlFiles = FilenameIndex.getAllFilesByExt(project, "yml", scope);
         Collection<VirtualFile> yamlFiles = FilenameIndex.getAllFilesByExt(project, "yaml", scope);
         Collection<VirtualFile> propFiles = FilenameIndex.getAllFilesByExt(project, "properties", scope);
 
-        // Quét Properties trước
+        // Process properties
         for (VirtualFile vf : propFiles) {
-            if (vf.getName().startsWith("application")) {
+            if (vf.getName().startsWith("application") || vf.getName().startsWith("bootstrap")) {
                 try (InputStream is = vf.getInputStream()) {
                     Properties props = new Properties();
                     props.load(is);
@@ -39,25 +66,24 @@ public class SpringBootConfigReader {
                     if (props.containsKey("server.servlet.context-path")) {
                         contextPath[0] = props.getProperty("server.servlet.context-path");
                     }
-                } catch (Exception e) {
-                    // ignore
-                }
+                    if (props.containsKey("spring.application.name")) {
+                        appName[0] = props.getProperty("spring.application.name");
+                    }
+                } catch (Exception e) {}
             }
         }
 
-        // Quét YAML (Ghi đè nếu có)
+        // Process YAML
         Yaml yaml = new Yaml();
-        for (VirtualFile vf : ymlFiles) {
-            if (vf.getName().startsWith("application")) {
-                parseYamlConfig(vf, yaml, ref -> port[0] = ref[0], ref -> contextPath[0] = ref[0]);
+        List<VirtualFile> yamlAll = new ArrayList<>();
+        yamlAll.addAll(ymlFiles);
+        yamlAll.addAll(yamlFiles);
+        for (VirtualFile vf : yamlAll) {
+            if (vf.getName().startsWith("application") || vf.getName().startsWith("bootstrap")) {
+                parseYamlConfig(vf, yaml, ref -> port[0] = ref[0], ref -> contextPath[0] = ref[0], ref -> appName[0] = ref[0]);
             }
         }
-        for (VirtualFile vf : yamlFiles) {
-            if (vf.getName().startsWith("application")) {
-                parseYamlConfig(vf, yaml, ref -> port[0] = ref[0], ref -> contextPath[0] = ref[0]);
-            }
-        }
-        
+
         String cPath = contextPath[0];
         if (cPath == null || cPath.trim().isEmpty() || cPath.equals("/")) {
             cPath = "";
@@ -69,10 +95,10 @@ public class SpringBootConfigReader {
             cPath = cPath.substring(0, cPath.length() - 1);
         }
 
-        return "http://localhost:" + port[0] + cPath;
+        return new AppConfig("http://localhost:" + port[0] + cPath, appName[0]);
     }
 
-    private static void parseYamlConfig(VirtualFile vf, Yaml yaml, java.util.function.Consumer<String[]> setPort, java.util.function.Consumer<String[]> setContext) {
+    private static void parseYamlConfig(VirtualFile vf, Yaml yaml, java.util.function.Consumer<String[]> setPort, java.util.function.Consumer<String[]> setContext, java.util.function.Consumer<String[]> setAppName) {
         try (InputStream is = vf.getInputStream()) {
             Iterable<Object> iter = yaml.loadAll(is);
             for (Object obj : iter) {
@@ -94,6 +120,18 @@ public class SpringBootConfigReader {
                             }
                         }
                     }
+                    
+                    Object springObj = map.get("spring");
+                    if (springObj instanceof Map) {
+                        Map<String, Object> springMap = (Map<String, Object>) springObj;
+                        Object applicationObj = springMap.get("application");
+                        if (applicationObj instanceof Map) {
+                            Map<String, Object> applicationMap = (Map<String, Object>) applicationObj;
+                            if (applicationMap.containsKey("name")) {
+                                setAppName.accept(new String[]{String.valueOf(applicationMap.get("name"))});
+                            }
+                        }
+                    }
                 }
             }
         } catch (Exception e) {
@@ -101,9 +139,6 @@ public class SpringBootConfigReader {
         }
     }
 
-    /**
-     * Hàm đơn giản xử lý chuỗi kiểu ${PORT:8080}
-     */
     private static String resolvePlaceholders(String value, String defaultValue) {
         if (value == null) return defaultValue;
         value = value.trim();
@@ -113,7 +148,7 @@ public class SpringBootConfigReader {
             if (colonIndex != -1) {
                 return inner.substring(colonIndex + 1);
             }
-            return defaultValue; // Fallback if no default provided in ${ENV}
+            return defaultValue;
         }
         return value;
     }

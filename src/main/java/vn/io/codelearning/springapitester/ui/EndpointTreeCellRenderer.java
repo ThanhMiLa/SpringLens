@@ -18,10 +18,19 @@ public class EndpointTreeCellRenderer extends ColoredTreeCellRenderer {
 
         Object userObject = node.getUserObject();
 
-        if (userObject instanceof String) {
+        if (userObject instanceof vn.io.codelearning.springapitester.model.ServiceModel) {
+            vn.io.codelearning.springapitester.model.ServiceModel service = (vn.io.codelearning.springapitester.model.ServiceModel) userObject;
+            setIcon(com.intellij.icons.AllIcons.Nodes.Module);
+            append(service.getName(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
+            if (service.getDirectBaseUrl() != null && !service.getDirectBaseUrl().isEmpty()) {
+                String portInfo = service.getDirectBaseUrl().replace("http://localhost:", "");
+                if (portInfo.contains("/")) portInfo = portInfo.substring(0, portInfo.indexOf('/'));
+                append(" [" + portInfo + "]", SimpleTextAttributes.GRAY_ATTRIBUTES);
+            }
+        } else if (userObject instanceof String) {
             // Scanned Controller Node
             setIcon(com.intellij.icons.AllIcons.Nodes.Folder);
-            append((String) userObject, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
+            append((String) userObject, SimpleTextAttributes.REGULAR_ATTRIBUTES);
         } else if (userObject instanceof vn.io.codelearning.springapitester.model.FolderModel) {
             // Manual Folder Node
             vn.io.codelearning.springapitester.model.FolderModel folder = (vn.io.codelearning.springapitester.model.FolderModel) userObject;

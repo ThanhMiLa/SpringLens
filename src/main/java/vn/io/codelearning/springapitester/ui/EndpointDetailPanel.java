@@ -78,8 +78,9 @@ public class EndpointDetailPanel extends JPanel {
             private void update() {
                 if (!isUpdatingUI && currentEndpoint != null) {
                     String url = urlField.getText();
-                    if (url.startsWith(baseUrl)) {
-                        currentEndpoint.setPath(url.substring(baseUrl.length()));
+                    String effectiveBaseUrl = getEffectiveBaseUrl(currentEndpoint);
+                    if (url.startsWith(effectiveBaseUrl)) {
+                        currentEndpoint.setPath(url.substring(effectiveBaseUrl.length()));
                     } else {
                         currentEndpoint.setPath(url);
                     }
@@ -305,6 +306,12 @@ public class EndpointDetailPanel extends JPanel {
 
     private boolean isUpdatingUI = false;
 
+    public void refreshEndpoint() {
+        if (currentEndpoint != null) {
+            displayEndpoint(currentEndpoint);
+        }
+    }
+
     public void displayEndpoint(EndpointModel endpoint) {
         // Collect old data before switching
         collectDataToModel();
@@ -324,7 +331,9 @@ public class EndpointDetailPanel extends JPanel {
         isUpdatingUI = true;
         try {
             methodComboBox.setSelectedItem(endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
-            urlField.setText(baseUrl + endpoint.getPath());
+            String effectiveBaseUrl = getEffectiveBaseUrl(endpoint);
+            String fullUrl = effectiveBaseUrl + endpoint.getPath();
+            urlField.setText(fullUrl.replace("//", "/").replace("http:/l", "http://l").replace("https:/l", "https://l"));
         } finally {
             isUpdatingUI = false;
         }
@@ -366,13 +375,6 @@ public class EndpointDetailPanel extends JPanel {
         vn.io.codelearning.springapitester.model.HttpMethodEnum method = (vn.io.codelearning.springapitester.model.HttpMethodEnum) methodComboBox.getSelectedItem();
         if (method != null) {
             currentEndpoint.setHttpMethod(method);
-        }
-        
-        String url = urlField.getText();
-        if (url.startsWith(baseUrl)) {
-            currentEndpoint.setPath(url.substring(baseUrl.length()));
-        } else {
-            currentEndpoint.setPath(url);
         }
         
         currentEndpoint.setCustomHeaders(headerPanel.getHeaders());
@@ -520,5 +522,23 @@ public class EndpointDetailPanel extends JPanel {
                 });
             }
         });
+    }
+
+    private String getEffectiveBaseUrl(EndpointModel endpoint) {
+        if (endpoint == null) return baseUrl;
+        if (endpoint.isManual()) return baseUrl;
+        
+        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        if (state != null && state.gatewayModeEnabled) {
+            com.intellij.openapi.module.Module[] modules = com.intellij.openapi.module.ModuleManager.getInstance(project).getModules();
+            for (com.intellij.openapi.module.Module m : modules) {
+                vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig config = vn.io.codelearning.springapitester.util.GatewayConfigReader.parseGatewayConfig(project, m);
+                if (config != null) {
+                    String[] parts = vn.io.codelearning.springapitester.util.GatewayUrlCalculator.calculateFull(endpoint, config);
+                    return parts[0]; // Returns effective base
+                }
+            }
+        }
+        return endpoint.getDirectBaseUrl() != null ? endpoint.getDirectBaseUrl() : baseUrl;
     }
 }
