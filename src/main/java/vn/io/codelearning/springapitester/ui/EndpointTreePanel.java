@@ -127,12 +127,42 @@ public class EndpointTreePanel extends JPanel {
                     handleDoubleClickRename();
                 } else if (javax.swing.SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 1) {
                     java.awt.Rectangle bounds = tree.getRowBounds(row);
-                    if (bounds != null && e.getX() > bounds.x + bounds.width - 35) {
+                    if (bounds != null) {
                         javax.swing.tree.TreePath path = tree.getPathForRow(row);
                         if (path != null) {
                             DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
-                            if (node.getUserObject() instanceof vn.io.codelearning.springapitester.model.FolderModel) {
-                                handleAddNewRequest((vn.io.codelearning.springapitester.model.FolderModel) node.getUserObject());
+                            Object userObject = node.getUserObject();
+                            
+                            // Check if click is on the far right (for adding new manual request)
+                            if (e.getX() > bounds.x + bounds.width - 35) {
+                                if (userObject instanceof vn.io.codelearning.springapitester.model.FolderModel) {
+                                    handleAddNewRequest((vn.io.codelearning.springapitester.model.FolderModel) userObject);
+                                }
+                            } 
+                            // Check if click is on the icon area (left side)
+                            else if (e.getX() >= bounds.x && e.getX() <= bounds.x + 22) {
+                                if (userObject instanceof vn.io.codelearning.springapitester.model.EndpointModel) {
+                                    vn.io.codelearning.springapitester.model.EndpointModel ep = (vn.io.codelearning.springapitester.model.EndpointModel) userObject;
+                                    ep.setSecured(!ep.isSecured());
+                                    
+                                    vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                                    if (state != null) {
+                                        state.saveEndpoint(ep);
+                                        vn.io.codelearning.springapitester.state.EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(ep));
+                                        if (saved != null) {
+                                            saved.hasSecuredOverride = true;
+                                        }
+                                    }
+                                    tree.repaint();
+                                    
+                                    // Trigger detail panel update if this endpoint is currently selected
+                                    if (onEndpointSelected != null && tree.getSelectionPath() != null) {
+                                        DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) tree.getSelectionPath().getLastPathComponent();
+                                        if (selectedNode == node) {
+                                            onEndpointSelected.accept(ep);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

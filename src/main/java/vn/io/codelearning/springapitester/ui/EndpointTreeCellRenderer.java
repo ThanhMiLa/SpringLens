@@ -43,9 +43,9 @@ public class EndpointTreeCellRenderer extends ColoredTreeCellRenderer {
             EndpointModel endpoint = (EndpointModel) userObject;
             
             if (endpoint.isSecured()) {
-                setIcon(com.intellij.icons.AllIcons.Nodes.Padlock); // Khóa
+                setIcon(new ScaledIcon(com.intellij.icons.AllIcons.Nodes.C_private, 1.5f)); // Khóa (Màu đỏ)
             } else {
-                setIcon(null); // Bỏ trống không hiển thị icon cho API public
+                setIcon(new ScaledIcon(com.intellij.icons.AllIcons.Nodes.C_public, 1.5f)); // Mở khóa (Màu xanh)
             }
             
             if (endpoint.isManual()) {
