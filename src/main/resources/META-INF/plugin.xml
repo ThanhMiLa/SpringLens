@@ -1,25 +1,132 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>vn.io.codelearning.springapitester</id>
-    <name>SpringLens</name>
+    <id>com.github.thanhmila.plugin.springlens</id>
+    <name>SpringLens - Spring Boot RESTful API Tester</name>
+    <version>1.0.0</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
-        <p><b>Spring API Tester</b> là một plugin siêu nhẹ hỗ trợ kiểm thử API.</p>
-        <p>Công cụ này được thiết kế để tự động nhận diện các endpoint của Spring Boot (@GetMapping, @PostMapping...) thông qua cây cú pháp PSI, giúp nhà phát triển backend kiểm thử trực tiếp trên IDE mà không cần chuyển đổi sang Postman.</p>
+        <h2>⚡ SpringLens — Native, Zero-Config Spring Boot RESTful API Tester</h2>
+        <p>
+            <b>Stop context-switching. Test your Spring Boot APIs right where you write them.</b>
+        </p>
+        <p>
+            <b>SpringLens</b> is a powerful, lightweight RESTful API testing client integrated directly into IntelliJ IDEA. 
+            Designed specifically for Spring Boot and Spring Cloud developers, it allows you to test, debug, and manage your APIs instantly without leaving your editor.
+        </p>
+        <p>
+            SpringLens automatically scans your project to organize all endpoints into an intuitive tree, generates mock JSON request bodies from your DTOs, effortlessly handles Spring Cloud Gateway routing, and provides one-click authentication sharing — delivering a complete, Postman-grade testing experience right where you code.
+        </p>
+
+        <hr/>
+
+        <h3>🚀 Why Choose SpringLens?</h3>
+        <ul>
+            <li><b>Zero Context Switching:</b> Test endpoints directly within your IDE without opening heavy external applications.</li>
+            <li><b>Zero Configuration:</b> No extra annotations, no YAML setup, and no dependencies to add to your <code>pom.xml</code> or <code>build.gradle</code>.</li>
+            <li><b>100% Privacy & Offline:</b> Your API payloads and auth tokens never leave your local environment.</li>
+            <li><b>Microservices First:</b> Built from the ground up with Spring Cloud Gateway and multi-module architectures in mind.</li>
+        </ul>
+
+        <hr/>
+
+        <h3>✨ Key Features:</h3>
+
+        <h4>🔍 Deep AST/PSI Endpoint Scanner</h4>
+        <ul>
+            <li>Automatically discovers all Spring Controllers across all project modules.</li>
+            <li>Full support for <code>@RestController</code>, <code>@Controller</code>, <code>@RequestMapping</code>, <code>@GetMapping</code>, <code>@PostMapping</code>, <code>@PutMapping</code>, <code>@DeleteMapping</code>, and <code>@PatchMapping</code>.</li>
+            <li>Accurately parses <code>@PathVariable</code> (including regex patterns like <code>{id:[0-9]+}</code>), <code>@RequestParam</code>, <code>@RequestHeader</code>, <code>@RequestBody</code>, and <code>@RequestPart</code> (Multipart file uploads).</li>
+        </ul>
+
+        <h4>📦 Smart DTO-to-JSON Schema Generator</h4>
+        <ul>
+            <li>Instantly generates mock JSON request bodies directly from Java DTO classes, POJOs, and Records.</li>
+            <li>Built-in circular reference protection prevents infinite loops in complex object graphs.</li>
+            <li><b>Smart Merge:</b> Preserves your customized input values when re-syncing newly added DTO fields.</li>
+        </ul>
+
+        <h4>🌐 Spring Cloud Gateway & Microservices Engine</h4>
+        <ul>
+            <li>Automatically detects Spring Cloud Gateway configurations from <code>application.yml</code> / <code>application.properties</code>.</li>
+            <li>Accurately computes reverse routing rules, including <code>StripPrefix</code>, <code>PrefixPath</code>, and <code>RewritePath</code> filters.</li>
+            <li>Seamlessly preserves individual downstream service <code>context-path</code> settings.</li>
+            <li>One-click toggle between <b>Direct Service Mode</b> and <b>API Gateway Mode</b>.</li>
+        </ul>
+
+        <h4>🔑 Global Authentication & Bearer Token Sharing</h4>
+        <ul>
+            <li>Full support for <b>Bearer JWT</b>, <b>Basic Auth</b>, and <b>API Key</b> (Header / Query param).</li>
+            <li><b>"Apply to All APIs" Button:</b> Paste your JWT token once and instantly synchronize it across all scanned endpoints.</li>
+        </ul>
+
+        <h4>📁 Custom Endpoints & Collection Manager</h4>
+        <ul>
+            <li>Manually create custom folders and HTTP requests to test external APIs, third-party webhooks, or ad-hoc endpoints alongside your scanned project APIs.</li>
+            <li>Freely customize URL, method, headers, parameters, and payloads for custom requests.</li>
+            <li>One-click <b>Copy as cURL</b> command for terminal debugging and team sharing.</li>
+        </ul>
+
+        <h4>🔒 Dev-Friendly Local SSL</h4>
+        <ul>
+            <li>Built-in Trust-All SSL socket handler for local microservices running on self-signed <code>https://localhost</code> certificates without SSLHandshakeException failures.</li>
+        </ul>
+
+        <h4>💾 Workspace State Persistence</h4>
+        <ul>
+            <li>Automatically saves your parameters, custom headers, and request bodies per-project across IDE restarts.</li>
+        </ul>
+
+        <hr/>
+
+        <h3>🛠️ Supported Technologies:</h3>
+        <p>
+            • <b>Spring Framework:</b> 5.x, 6.x<br/>
+            • <b>Spring Boot:</b> 2.x, 3.x<br/>
+            • <b>Spring Cloud:</b> Spring Cloud Gateway, Eureka / Consul Discovery<br/>
+            • <b>Build Tools:</b> Maven, Gradle<br/>
+            • <b>Languages:</b> Java 17+, Kotlin
+        </p>
+
+        <hr/>
+
+        <h3>📖 Quick Start (3 Easy Steps):</h3>
+        <ol>
+            <li>Open any Spring Boot project in IntelliJ IDEA.</li>
+            <li>Click the <b>SpringLens</b> tab on the right sidebar.</li>
+            <li>Select any endpoint from the scanned tree, review or customize the payload, and hit <b>Send</b>!</li>
+        </ol>
+
+        <hr/>
+
+        <p>
+            💬 <b>Feedback & Issues:</b> Found a bug or have a feature request? Please visit our 
+            <a href="https://github.com/ThanhMiLa/SpringLens/issues">GitHub Issues</a> page.
+        </p>
     ]]></description>
 
-    <!-- Phụ thuộc nền tảng IntelliJ mặc định -->
+    <change-notes><![CDATA[
+        <h3>1.0.0 — Initial Stable Release</h3>
+        <ul>
+            <li><b>Smart AST Endpoint Scanner:</b> Automatically discovers all Spring Boot REST endpoints across all project modules.</li>
+            <li><b>DTO Schema Generator:</b> Instant dummy JSON template generation from Java DTO classes with loop detection and smart merge.</li>
+            <li><b>Spring Cloud Gateway Support:</b> Intelligent URL calculation for microservices routing with StripPrefix, PrefixPath, and context-path retention.</li>
+            <li><b>Authentication Manager:</b> Bearer Token, Basic Auth, and API Key support with one-click "Apply to All APIs" global synchronization.</li>
+            <li><b>Postman-Style Native UI:</b> Soft word wrapping, colorful HTTP method badges, response formatting, and cURL export.</li>
+            <li><b>Trust-All SSL for Dev:</b> Seamless local HTTPS testing without SSLHandshakeException errors.</li>
+            <li><b>State Persistence:</b> Automatically preserves parameter inputs and testing history across IDE restarts.</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- IntelliJ Platform dependencies -->
     <depends>com.intellij.modules.platform</depends>
-    <!-- Phụ thuộc module Java để lấy quyền phân tích cú pháp PSI của Java -->
     <depends>com.intellij.modules.java</depends>
 
-    <!-- Tạm thời để trống. Chúng ta sẽ thêm class Java vào đây sau -->
     <extensions defaultExtensionNs="com.intellij">
-    <toolWindow id="SpringLens"
-                anchor="right"
-                factoryClass="vn.io.codelearning.springapitester.ui.SpringLensToolWindowFactory"
-                icon="AllIcons.Nodes.WebFolder"/>
-    <projectService serviceImplementation="vn.io.codelearning.springapitester.state.SpringLensState"/>
-  </extensions>
+        <toolWindow id="SpringLens"
+                    anchor="right"
+                    factoryClass="vn.io.codelearning.springapitester.ui.SpringLensToolWindowFactory"
+                    icon="/icons/springlens.svg"/>
+        <projectService serviceImplementation="vn.io.codelearning.springapitester.state.SpringLensState"/>
+    </extensions>
 </idea-plugin>
