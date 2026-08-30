@@ -219,15 +219,28 @@ public final class SpringAnnotationUtils {
 
     // ---------- SECURITY CHECK ----------
 
-    public static boolean isEndpointSecured(PsiMethod method, PsiClass controllerClass, String fullPath) {
+    public static boolean isEndpointSecured(PsiMethod method, PsiClass controllerClass, String fullPath, vn.io.codelearning.springapitester.model.HttpMethodEnum httpMethod, java.util.List<vn.io.codelearning.springapitester.model.PublicSecurityRule> globalPublicRules) {
+        // LỚP 2: Kiểm tra Annotation trên Method
         Boolean methodLevel = checkSecurityAnnotation(method);
         if (methodLevel != null) return methodLevel;
 
+        // LỚP 2: Kiểm tra Annotation trên Class
         Boolean classLevel = checkSecurityAnnotation(controllerClass);
         if (classLevel != null) return classLevel;
 
-        // Mặc định (Unknown), giả định là Public để tiện sử dụng, dev có thể tự bật/tắt
-        return false;
+        // LỚP 3: Quét cấu hình SecurityFilterChain
+        if (globalPublicRules != null) {
+            for (vn.io.codelearning.springapitester.model.PublicSecurityRule rule : globalPublicRules) {
+                if (SpringUrlUtils.antPathMatch(rule.getPathPattern(), fullPath)) {
+                    if (rule.getHttpMethod() == null || rule.getHttpMethod() == httpMethod) {
+                        return false; // Là API Public
+                    }
+                }
+            }
+        }
+
+        // LỚP 4: Nguyên tắc Phòng ngự mặc định (Default Fallback)
+        return true; // Mặc định là Private
     }
 
     private static Boolean checkSecurityAnnotation(PsiModifierListOwner element) {

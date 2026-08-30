@@ -39,18 +39,26 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
             },
             () -> {
                 // When Reload is clicked
-                endpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
-                
-                // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
-                vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
-                if (state != null) {
-                    for (EndpointModel ep : endpoints) {
-                        state.restoreEndpoint(ep);
+                com.intellij.openapi.progress.ProgressManager.getInstance().run(new com.intellij.openapi.progress.Task.Backgroundable(project, "Scanning Spring Endpoints...", true) {
+                    @Override
+                    public void run(@NotNull com.intellij.openapi.progress.ProgressIndicator indicator) {
+                        List<EndpointModel> scannedEndpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
+                        
+                        // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
+                        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                        if (state != null) {
+                            for (EndpointModel ep : scannedEndpoints) {
+                                state.restoreEndpoint(ep);
+                            }
+                        }
+                        
+                        // Update Tree on EDT
+                        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                            endpoints = scannedEndpoints;
+                            treePanelHolder[0].updateEndpoints(endpoints);
+                        });
                     }
-                }
-                
-                // Update Tree
-                treePanelHolder[0].updateEndpoints(endpoints);
+                });
             }
         );
         

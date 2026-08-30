@@ -45,6 +45,7 @@ public class SpringEndpointScanner {
     private List<EndpointModel> doScan(Project project) {
         List<EndpointModel> result = new ArrayList<>();
         Set<PsiClass> controllerClasses = findControllerClasses(project);
+        List<vn.io.codelearning.springapitester.model.PublicSecurityRule> globalPublicRules = SecurityConfigScanner.scanForPublicRules(project);
 
         for (PsiClass controllerClass : controllerClasses) {
             String packageName = extractPackageName(controllerClass);
@@ -94,7 +95,7 @@ public class SpringEndpointScanner {
                 }
                 processedSignatures.add(signature);
 
-                List<EndpointModel> methodEndpoints = processMethod(method, controllerClass, classPaths, packageName, controllerName, classIsRest);
+                List<EndpointModel> methodEndpoints = processMethod(method, controllerClass, classPaths, packageName, controllerName, classIsRest, globalPublicRules);
                 for (EndpointModel ep : methodEndpoints) {
                     ep.setModuleName(moduleName);
                     ep.setDirectBaseUrl(directBaseUrl);
@@ -177,7 +178,8 @@ public class SpringEndpointScanner {
 
     private List<EndpointModel> processMethod(PsiMethod method, PsiClass controllerClass,
                                                List<String> classPaths, String packageName,
-                                               String controllerName, boolean classIsRest) {
+                                               String controllerName, boolean classIsRest,
+                                               List<vn.io.codelearning.springapitester.model.PublicSecurityRule> globalPublicRules) {
         List<EndpointModel> endpoints = new ArrayList<>();
 
         for (PsiAnnotation anno : method.getAnnotations()) {
@@ -194,7 +196,7 @@ public class SpringEndpointScanner {
                             String fullPath = SpringUrlUtils.combinePaths(classPath, methodPath);
 
                             EndpointModel model = new EndpointModel(httpMethod, fullPath, controllerName, packageName, method.getName());
-                            model.setSecured(SpringAnnotationUtils.isEndpointSecured(method, controllerClass, fullPath));
+                            model.setSecured(SpringAnnotationUtils.isEndpointSecured(method, controllerClass, fullPath, httpMethod, globalPublicRules));
                             model.setRestEndpoint(SpringAnnotationUtils.isRestMethod(method, classIsRest));
 
                             PsiType returnType = method.getReturnType();

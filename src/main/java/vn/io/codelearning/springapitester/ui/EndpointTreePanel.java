@@ -348,7 +348,63 @@ public class EndpointTreePanel extends JPanel {
             
         } else if (userObject instanceof EndpointModel) {
             EndpointModel endpoint = (EndpointModel) userObject;
+            
+            javax.swing.JMenuItem markPublicItem = new javax.swing.JMenuItem("Mark as Public (No Lock)");
+            markPublicItem.addActionListener(ev -> {
+                if (state != null) {
+                    endpoint.setSecured(false);
+                    state.saveEndpoint(endpoint); // saveEndpoint sets hasSecuredOverride and isSecuredOverride
+                    // Wait, we need to explicitly set the override
+                    vn.io.codelearning.springapitester.state.EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(endpoint));
+                    if (saved == null) {
+                        state.saveEndpoint(endpoint);
+                        saved = state.endpoints.get(state.getEndpointKey(endpoint));
+                    }
+                    if (saved != null) {
+                        saved.hasSecuredOverride = true;
+                        saved.isSecuredOverride = false;
+                    }
+                    tree.repaint();
+                }
+            });
+
+            javax.swing.JMenuItem markPrivateItem = new javax.swing.JMenuItem("Mark as Private (Lock)");
+            markPrivateItem.addActionListener(ev -> {
+                if (state != null) {
+                    endpoint.setSecured(true);
+                    vn.io.codelearning.springapitester.state.EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(endpoint));
+                    if (saved == null) {
+                        state.saveEndpoint(endpoint);
+                        saved = state.endpoints.get(state.getEndpointKey(endpoint));
+                    }
+                    if (saved != null) {
+                        saved.hasSecuredOverride = true;
+                        saved.isSecuredOverride = true;
+                    }
+                    tree.repaint();
+                }
+            });
+
+            javax.swing.JMenuItem resetSecurityItem = new javax.swing.JMenuItem("Reset Security Check (Auto)");
+            resetSecurityItem.addActionListener(ev -> {
+                if (state != null) {
+                    vn.io.codelearning.springapitester.state.EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(endpoint));
+                    if (saved != null) {
+                        saved.hasSecuredOverride = false;
+                        // We need to re-evaluate the auto state. 
+                        // An easy way is to trigger a rescan or just repaint and let the scanner handle it on next refresh.
+                        // But wait, the model's current state is overridden. Let's just ask user to click Reload.
+                        com.intellij.openapi.ui.Messages.showInfoMessage("Security check reset to Auto. Please click Reload to re-scan.", "Reset Security");
+                    }
+                }
+            });
+
+            popup.add(markPublicItem);
+            popup.add(markPrivateItem);
+            popup.add(resetSecurityItem);
+            
             if (endpoint.isManual()) {
+                popup.addSeparator();
                 javax.swing.JMenuItem renameItem = new javax.swing.JMenuItem("Rename Request");
                 renameItem.addActionListener(ev -> {
                     String newName = com.intellij.openapi.ui.Messages.showInputDialog(project, "Enter new request name:", "Rename Request", null, endpoint.getName(), null);
@@ -370,8 +426,8 @@ public class EndpointTreePanel extends JPanel {
                 
                 popup.add(renameItem);
                 popup.add(deleteItem);
-                popup.show(tree, e.getX(), e.getY());
             }
+            popup.show(tree, e.getX(), e.getY());
         }
     }
 }
