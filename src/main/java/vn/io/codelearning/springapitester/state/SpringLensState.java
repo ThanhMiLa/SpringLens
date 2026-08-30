@@ -57,7 +57,14 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         saved.requestBodyJson = endpoint.getRequestBodyJson();
         saved.bodyType = endpoint.getBodyType();
         saved.isSecuredOverride = endpoint.isSecured();
-        saved.hasSecuredOverride = true; // Mark that user overrides security
+        
+        // Inherit the previous override state so we don't accidentally lock all endpoints
+        EndpointSavedState oldSaved = endpoints.get(getEndpointKey(endpoint));
+        if (oldSaved != null) {
+            saved.hasSecuredOverride = oldSaved.hasSecuredOverride;
+        } else {
+            saved.hasSecuredOverride = false;
+        }
 
         for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
             if (param.getCurrentValue() != null) {

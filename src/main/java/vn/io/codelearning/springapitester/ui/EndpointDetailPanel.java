@@ -204,6 +204,16 @@ public class EndpointDetailPanel extends JPanel {
         authPanel.setOnSecurityToggled(isSecured -> {
             if (currentEndpoint != null) {
                 currentEndpoint.setSecured(isSecured);
+                // Save immediately so that if user clicks Reload, it restores the correct state
+                vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                if (state != null) {
+                    state.saveEndpoint(currentEndpoint);
+                    // Explicitly lock the security state because the user manually toggled it in the UI
+                    vn.io.codelearning.springapitester.state.EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(currentEndpoint));
+                    if (saved != null) {
+                        saved.hasSecuredOverride = true;
+                    }
+                }
                 if (onEndpointUpdated != null) {
                     onEndpointUpdated.run();
                 }
