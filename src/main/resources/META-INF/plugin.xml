@@ -6,102 +6,39 @@
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
-        <h2>⚡ SpringLens — Native, Zero-Config Spring Boot RESTful API Tester</h2>
-        <p>
-            <b>Stop context-switching. Test your Spring Boot APIs right where you write them.</b>
-        </p>
-        <p>
-            <b>SpringLens</b> is a powerful, lightweight RESTful API testing client integrated directly into IntelliJ IDEA. 
-            Designed specifically for Spring Boot and Spring Cloud developers, it allows you to test, debug, and manage your APIs instantly without leaving your editor.
-        </p>
-        <p>
-            SpringLens automatically scans your project to organize all endpoints into an intuitive tree, generates mock JSON request bodies from your DTOs, effortlessly handles Spring Cloud Gateway routing, and provides one-click authentication sharing — delivering a complete, Postman-grade testing experience right where you code.
+
+        <p align="center">
+            <img src="https://raw.githubusercontent.com/ThanhMiLa/SpringLens/main/docs/images/demo.gif" width="600" alt="SpringLens Live Demo" />
         </p>
 
-        <hr/>
-
-        <h3>🚀 Why Choose SpringLens?</h3>
+        <h3>✨ Key Features</h3>
         <ul>
-            <li><b>Zero Context Switching:</b> Test endpoints directly within your IDE without opening heavy external applications.</li>
-            <li><b>Zero Configuration:</b> No extra annotations, no YAML setup, and no dependencies to add to your <code>pom.xml</code> or <code>build.gradle</code>.</li>
-            <li><b>100% Privacy & Offline:</b> Your API payloads and auth tokens never leave your local environment.</li>
-            <li><b>Microservices First:</b> Built from the ground up with Spring Cloud Gateway and multi-module architectures in mind.</li>
+            <li>🔍 <b>Auto-Scan Endpoints:</b> Instantly discovers all <code>@RestController</code> endpoints across all project modules.</li>
+            <li>⚡ <b>Instant DTO Sync:</b> Generates mock JSON request bodies directly from Java DTO classes, POJOs, and Records with recursive loop protection.</li>
+            <li>🌐 <b>Spring Cloud Gateway Ready:</b> Auto-detects Gateway routes, computes reverse routing (<code>StripPrefix</code>, <code>PrefixPath</code>, <code>RewritePath</code>), and preserves service <code>context-path</code>.</li>
+            <li>🔑 <b>Global Auth Sharing:</b> Set Bearer JWT tokens or API Keys once and sync to all endpoints with one-click <i>"Apply to All APIs"</i>.</li>
+            <li>📁 <b>Custom Collections:</b> Create custom folders and manual HTTP requests to test external APIs or webhooks alongside project APIs.</li>
+            <li>🔒 <b>Trust-All Local SSL:</b> Seamless testing for local microservices running on self-signed <code>https://localhost</code> certificates.</li>
+            <li>💾 <b>State Persistence:</b> Automatically saves request params, custom headers, and payloads per-project across IDE restarts.</li>
+            <li>📋 <b>Instant cURL Export:</b> One-click copy for ready-to-run <code>curl</code> commands for terminal testing.</li>
         </ul>
 
-        <hr/>
-
-        <h3>✨ Key Features:</h3>
-
-        <h4>🔍 Deep AST/PSI Endpoint Scanner</h4>
-        <ul>
-            <li>Automatically discovers all Spring Controllers across all project modules.</li>
-            <li>Full support for <code>@RestController</code>, <code>@Controller</code>, <code>@RequestMapping</code>, <code>@GetMapping</code>, <code>@PostMapping</code>, <code>@PutMapping</code>, <code>@DeleteMapping</code>, and <code>@PatchMapping</code>.</li>
-            <li>Accurately parses <code>@PathVariable</code> (including regex patterns like <code>{id:[0-9]+}</code>), <code>@RequestParam</code>, <code>@RequestHeader</code>, <code>@RequestBody</code>, and <code>@RequestPart</code> (Multipart file uploads).</li>
-        </ul>
-
-        <h4>📦 Smart DTO-to-JSON Schema Generator</h4>
-        <ul>
-            <li>Instantly generates mock JSON request bodies directly from Java DTO classes, POJOs, and Records.</li>
-            <li>Built-in circular reference protection prevents infinite loops in complex object graphs.</li>
-            <li><b>Smart Merge:</b> Preserves your customized input values when re-syncing newly added DTO fields.</li>
-        </ul>
-
-        <h4>🌐 Spring Cloud Gateway & Microservices Engine</h4>
-        <ul>
-            <li>Automatically detects Spring Cloud Gateway configurations from <code>application.yml</code> / <code>application.properties</code>.</li>
-            <li>Accurately computes reverse routing rules, including <code>StripPrefix</code>, <code>PrefixPath</code>, and <code>RewritePath</code> filters.</li>
-            <li>Seamlessly preserves individual downstream service <code>context-path</code> settings.</li>
-            <li>One-click toggle between <b>Direct Service Mode</b> and <b>API Gateway Mode</b>.</li>
-        </ul>
-
-        <h4>🔑 Global Authentication & Bearer Token Sharing</h4>
-        <ul>
-            <li>Full support for <b>Bearer JWT</b>, <b>Basic Auth</b>, and <b>API Key</b> (Header / Query param).</li>
-            <li><b>"Apply to All APIs" Button:</b> Paste your JWT token once and instantly synchronize it across all scanned endpoints.</li>
-        </ul>
-
-        <h4>📁 Custom Endpoints & Collection Manager</h4>
-        <ul>
-            <li>Manually create custom folders and HTTP requests to test external APIs, third-party webhooks, or ad-hoc endpoints alongside your scanned project APIs.</li>
-            <li>Freely customize URL, method, headers, parameters, and payloads for custom requests.</li>
-            <li>One-click <b>Copy as cURL</b> command for terminal debugging and team sharing.</li>
-        </ul>
-
-        <h4>🔒 Dev-Friendly Local SSL</h4>
-        <ul>
-            <li>Built-in Trust-All SSL socket handler for local microservices running on self-signed <code>https://localhost</code> certificates without SSLHandshakeException failures.</li>
-        </ul>
-
-        <h4>💾 Workspace State Persistence</h4>
-        <ul>
-            <li>Automatically saves your parameters, custom headers, and request bodies per-project across IDE restarts.</li>
-        </ul>
-
-        <hr/>
-
-        <h3>🛠️ Supported Technologies:</h3>
-        <p>
-            • <b>Spring Framework:</b> 5.x, 6.x<br/>
-            • <b>Spring Boot:</b> 2.x, 3.x<br/>
-            • <b>Spring Cloud:</b> Spring Cloud Gateway, Eureka / Consul Discovery<br/>
-            • <b>Build Tools:</b> Maven, Gradle<br/>
-            • <b>Languages:</b> Java 17+, Kotlin
-        </p>
-
-        <hr/>
-
-        <h3>📖 Quick Start (3 Easy Steps):</h3>
+        <h3>🚀 Quick Start</h3>
         <ol>
             <li>Open any Spring Boot project in IntelliJ IDEA.</li>
-            <li>Click the <b>SpringLens</b> tab on the right sidebar.</li>
-            <li>Select any endpoint from the scanned tree, review or customize the payload, and hit <b>Send</b>!</li>
+            <li>Click the <b>SpringLens</b> icon on the right sidebar.</li>
+            <li>Select an endpoint, review the payload, and click <b>Send</b>!</li>
         </ol>
 
-        <hr/>
+        <h3>🛠️ Compatibility</h3>
+        <p>
+            • <b>Spring Boot:</b> 2.x, 3.x | <b>Spring Framework:</b> 5.x, 6.x<br/>
+            • <b>Spring Cloud:</b> Gateway, Eureka, Consul<br/>
+            • <b>Languages:</b> Java 17+, Kotlin | <b>Build:</b> Maven, Gradle
+        </p>
 
         <p>
-            💬 <b>Feedback & Issues:</b> Found a bug or have a feature request? Please visit our 
-            <a href="https://github.com/ThanhMiLa/SpringLens/issues">GitHub Issues</a> page.
+            💬 <b>Issues & Feedback:</b> <a href="https://github.com/ThanhMiLa/SpringLens/issues">GitHub Issues</a>
         </p>
     ]]></description>
 
