@@ -249,6 +249,14 @@ public class EndpointTreePanel extends JPanel {
                             manualEp.getParameters().addAll(savedEp.manualParameters);
                         }
                         
+                        // Restore Response Cache
+                        manualEp.setLastResponseBody(savedEp.lastResponseBody);
+                        manualEp.setLastResponseStatusCode(savedEp.lastResponseStatusCode);
+                        manualEp.setLastResponseStatusMessage(savedEp.lastResponseStatusMessage);
+                        manualEp.setLastResponseTimeTakenMs(savedEp.lastResponseTimeTakenMs);
+                        manualEp.setLastResponseHeaders(savedEp.lastResponseHeaders);
+                        manualEp.setLastResponseFormat(savedEp.lastResponseFormat);
+
                         DefaultMutableTreeNode epNode = new DefaultMutableTreeNode(manualEp);
                         folderNode.add(epNode);
                     }

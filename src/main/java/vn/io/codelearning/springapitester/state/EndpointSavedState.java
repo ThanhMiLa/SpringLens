@@ -17,6 +17,14 @@ public class EndpointSavedState {
     public RequestBodyType bodyType = RequestBodyType.NONE;
     public boolean isSecuredOverride = false;
     public boolean hasSecuredOverride = false;
+
+    // Response Cache
+    public String lastResponseBody = "";
+    public int lastResponseStatusCode = 0;
+    public String lastResponseStatusMessage = "";
+    public long lastResponseTimeTakenMs = 0;
+    public String lastResponseHeaders = "";
+    public String lastResponseFormat = "JSON";
     
     // Module 7: Fields for manual endpoints
     public String id;

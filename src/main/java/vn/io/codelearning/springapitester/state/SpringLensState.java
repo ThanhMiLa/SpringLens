@@ -58,6 +58,14 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         saved.bodyType = endpoint.getBodyType();
         saved.isSecuredOverride = endpoint.isSecured();
         
+        // Response Cache
+        saved.lastResponseBody = endpoint.getLastResponseBody();
+        saved.lastResponseStatusCode = endpoint.getLastResponseStatusCode();
+        saved.lastResponseStatusMessage = endpoint.getLastResponseStatusMessage();
+        saved.lastResponseTimeTakenMs = endpoint.getLastResponseTimeTakenMs();
+        saved.lastResponseHeaders = endpoint.getLastResponseHeaders();
+        saved.lastResponseFormat = endpoint.getLastResponseFormat();
+
         // Inherit the previous override state so we don't accidentally lock all endpoints
         EndpointSavedState oldSaved = endpoints.get(getEndpointKey(endpoint));
         if (oldSaved != null) {
@@ -123,5 +131,13 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
                 param.setCurrentValue(saved.paramValues.get(param.getName()));
             }
         }
+
+        // Restore Response Cache
+        endpoint.setLastResponseBody(saved.lastResponseBody);
+        endpoint.setLastResponseStatusCode(saved.lastResponseStatusCode);
+        endpoint.setLastResponseStatusMessage(saved.lastResponseStatusMessage);
+        endpoint.setLastResponseTimeTakenMs(saved.lastResponseTimeTakenMs);
+        endpoint.setLastResponseHeaders(saved.lastResponseHeaders);
+        endpoint.setLastResponseFormat(saved.lastResponseFormat);
     }
 }

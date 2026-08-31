@@ -32,6 +32,14 @@ public class EndpointModel {
     private String moduleName;            // Service chứa endpoint
     private String directBaseUrl;         // URL gọi trực tiếp (http://localhost:8081)
 
+    // Cached Response fields
+    private String lastResponseBody = "";
+    private int lastResponseStatusCode = 0;
+    private String lastResponseStatusMessage = "";
+    private long lastResponseTimeTakenMs = 0;
+    private String lastResponseHeaders = "";
+    private String lastResponseFormat = "JSON";
+
     public EndpointModel() {
         this.id = UUID.randomUUID().toString();
         this.name = "";
@@ -289,5 +297,53 @@ public class EndpointModel {
 
     public void setDirectBaseUrl(String directBaseUrl) {
         this.directBaseUrl = directBaseUrl;
+    }
+
+    public String getLastResponseBody() {
+        return lastResponseBody != null ? lastResponseBody : "";
+    }
+
+    public void setLastResponseBody(String lastResponseBody) {
+        this.lastResponseBody = lastResponseBody != null ? lastResponseBody : "";
+    }
+
+    public int getLastResponseStatusCode() {
+        return lastResponseStatusCode;
+    }
+
+    public void setLastResponseStatusCode(int lastResponseStatusCode) {
+        this.lastResponseStatusCode = lastResponseStatusCode;
+    }
+
+    public String getLastResponseStatusMessage() {
+        return lastResponseStatusMessage != null ? lastResponseStatusMessage : "";
+    }
+
+    public void setLastResponseStatusMessage(String lastResponseStatusMessage) {
+        this.lastResponseStatusMessage = lastResponseStatusMessage != null ? lastResponseStatusMessage : "";
+    }
+
+    public long getLastResponseTimeTakenMs() {
+        return lastResponseTimeTakenMs;
+    }
+
+    public void setLastResponseTimeTakenMs(long lastResponseTimeTakenMs) {
+        this.lastResponseTimeTakenMs = lastResponseTimeTakenMs;
+    }
+
+    public String getLastResponseHeaders() {
+        return lastResponseHeaders != null ? lastResponseHeaders : "";
+    }
+
+    public void setLastResponseHeaders(String lastResponseHeaders) {
+        this.lastResponseHeaders = lastResponseHeaders != null ? lastResponseHeaders : "";
+    }
+
+    public String getLastResponseFormat() {
+        return lastResponseFormat != null && !lastResponseFormat.isBlank() ? lastResponseFormat : "JSON";
+    }
+
+    public void setLastResponseFormat(String lastResponseFormat) {
+        this.lastResponseFormat = (lastResponseFormat != null && !lastResponseFormat.isBlank()) ? lastResponseFormat : "JSON";
     }
 }

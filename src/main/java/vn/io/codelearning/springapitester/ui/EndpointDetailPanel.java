@@ -339,6 +339,14 @@ public class EndpointDetailPanel extends JPanel {
         String lang = (String) responseLanguageCombo.getSelectedItem();
         if (lang == null) lang = "JSON";
         
+        if (!isUpdatingUI && currentEndpoint != null) {
+            currentEndpoint.setLastResponseFormat(lang);
+            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+            if (state != null) {
+                state.saveEndpoint(currentEndpoint);
+            }
+        }
+        
         String ext = lang.toLowerCase();
         if (ext.equals("text")) ext = "txt";
         
@@ -406,12 +414,6 @@ public class EndpointDetailPanel extends JPanel {
 
         String json = endpoint.getRequestBodyJson() != null ? endpoint.getRequestBodyJson() : "";
         
-        // Safely update editor document
-        ApplicationManager.getApplication().runWriteAction(() -> {
-            requestBodyEditor.getDocument().setText(json);
-            responseBodyEditor.getDocument().setText("");
-        });
-        
         // Set Body Type UI
         if (endpoint.getBodyType() == vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA) {
             formRadio.setSelected(true);
@@ -422,9 +424,52 @@ public class EndpointDetailPanel extends JPanel {
             ((CardLayout) bodyCards.getLayout()).show(bodyCards, "JSON");
             syncBtn.setVisible(true);
         }
-        
-        statusLabel.setText("Ready");
-        responseHeadersArea.setText("");
+
+        // Restore or Reset Cached Response
+        String respBody = endpoint.getLastResponseBody() != null ? endpoint.getLastResponseBody() : "";
+        String respHeaders = endpoint.getLastResponseHeaders() != null ? endpoint.getLastResponseHeaders() : "";
+        String respFormat = (endpoint.getLastResponseFormat() != null && !endpoint.getLastResponseFormat().isBlank()) 
+                ? endpoint.getLastResponseFormat() 
+                : "JSON";
+
+        isUpdatingUI = true;
+        try {
+            if (!respFormat.equals(responseLanguageCombo.getSelectedItem())) {
+                responseLanguageCombo.setSelectedItem(respFormat);
+            }
+        } finally {
+            isUpdatingUI = false;
+        }
+
+        // Safely update editor document
+        ApplicationManager.getApplication().runWriteAction(() -> {
+            requestBodyEditor.getDocument().setText(json);
+            responseBodyEditor.getDocument().setText(respBody);
+        });
+
+        responseHeadersArea.setText(respHeaders);
+
+        // Update status label
+        if (endpoint.getLastResponseStatusCode() > 0) {
+            int code = endpoint.getLastResponseStatusCode();
+            String colorHex = "#7A7A7A"; // Default gray
+            if (code >= 200 && code < 300) colorHex = "#5CB85C"; // Green
+            else if (code >= 300 && code < 400) colorHex = "#5BC0DE"; // Cyan
+            else if (code >= 400 && code < 600) colorHex = "#D9534F"; // Red
+
+            String msg = endpoint.getLastResponseStatusMessage();
+            if (msg == null || msg.isBlank()) {
+                msg = getHttpStatusMessage(code);
+            }
+
+            String html = String.format("<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span><font color='gray'> &nbsp; %d ms</font></html>", 
+                                        colorHex, code, msg, endpoint.getLastResponseTimeTakenMs());
+            statusLabel.setText(html);
+        } else if (endpoint.getLastResponseStatusMessage() != null && !endpoint.getLastResponseStatusMessage().isBlank()) {
+            statusLabel.setText(endpoint.getLastResponseStatusMessage());
+        } else {
+            statusLabel.setText("Ready");
+        }
     }
 
     private void collectDataToModel() {
@@ -553,6 +598,8 @@ public class EndpointDetailPanel extends JPanel {
                                                     colorHex, code, msg, response.getTimeTakenMs());
                         statusLabel.setText(html);
                         
+                        String bodyText = response.getBody() != null ? response.getBody() : "";
+
                         // Update Response Body Editor
                         ApplicationManager.getApplication().runWriteAction(() -> {
                             // Find Content-Type
@@ -572,14 +619,16 @@ public class EndpointDetailPanel extends JPanel {
                             else if (contentType.contains("html")) targetFormat = "HTML";
                             else if (contentType.contains("xml")) targetFormat = "XML";
                             
-                            // Prevent infinite loop by temporary removing listener?
-                            // No, just setSelectedItem will trigger it, which is fine, it handles the editor recreate!
-                            
-                            if (!targetFormat.equals(responseLanguageCombo.getSelectedItem())) {
-                                responseLanguageCombo.setSelectedItem(targetFormat);
+                            isUpdatingUI = true;
+                            try {
+                                if (!targetFormat.equals(responseLanguageCombo.getSelectedItem())) {
+                                    responseLanguageCombo.setSelectedItem(targetFormat);
+                                }
+                            } finally {
+                                isUpdatingUI = false;
                             }
                             
-                            responseBodyEditor.getDocument().setText(response.getBody() != null ? response.getBody() : "");
+                            responseBodyEditor.getDocument().setText(bodyText);
                         });
 
                         // Update Headers
@@ -591,12 +640,49 @@ public class EndpointDetailPanel extends JPanel {
                                 }
                             });
                         }
-                        responseHeadersArea.setText(headersStr.toString());
+                        String headersText = headersStr.toString();
+                        responseHeadersArea.setText(headersText);
+
+                        // Save Response Cache to Model & Persistent State
+                        if (currentEndpoint != null) {
+                            currentEndpoint.setLastResponseStatusCode(code);
+                            currentEndpoint.setLastResponseStatusMessage(msg);
+                            currentEndpoint.setLastResponseTimeTakenMs(response.getTimeTakenMs());
+                            currentEndpoint.setLastResponseBody(bodyText);
+                            currentEndpoint.setLastResponseHeaders(headersText);
+                            String selectedFormat = (String) responseLanguageCombo.getSelectedItem();
+                            currentEndpoint.setLastResponseFormat(selectedFormat != null ? selectedFormat : "JSON");
+
+                            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                            if (state != null) {
+                                state.saveEndpoint(currentEndpoint);
+                            }
+                        }
+
                         sendBtn.setEnabled(true);
                     });
                 }).exceptionally(ex -> {
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        statusLabel.setText("Error: " + ex.getMessage());
+                        String errorMsg = "Error: " + ex.getMessage();
+                        statusLabel.setText(errorMsg);
+                        ApplicationManager.getApplication().runWriteAction(() -> {
+                            responseBodyEditor.getDocument().setText(errorMsg);
+                        });
+                        responseHeadersArea.setText("");
+
+                        if (currentEndpoint != null) {
+                            currentEndpoint.setLastResponseStatusCode(0);
+                            currentEndpoint.setLastResponseStatusMessage(errorMsg);
+                            currentEndpoint.setLastResponseTimeTakenMs(0);
+                            currentEndpoint.setLastResponseBody(errorMsg);
+                            currentEndpoint.setLastResponseHeaders("");
+                            currentEndpoint.setLastResponseFormat("TEXT");
+
+                            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                            if (state != null) {
+                                state.saveEndpoint(currentEndpoint);
+                            }
+                        }
                         sendBtn.setEnabled(true);
                     });
                     return null;
@@ -604,7 +690,26 @@ public class EndpointDetailPanel extends JPanel {
                 
             } catch (Exception ex) {
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    statusLabel.setText("Failed to build request: " + ex.getMessage());
+                    String errorMsg = "Failed to build request: " + ex.getMessage();
+                    statusLabel.setText(errorMsg);
+                    ApplicationManager.getApplication().runWriteAction(() -> {
+                        responseBodyEditor.getDocument().setText(errorMsg);
+                    });
+                    responseHeadersArea.setText("");
+
+                    if (currentEndpoint != null) {
+                        currentEndpoint.setLastResponseStatusCode(0);
+                        currentEndpoint.setLastResponseStatusMessage(errorMsg);
+                        currentEndpoint.setLastResponseTimeTakenMs(0);
+                        currentEndpoint.setLastResponseBody(errorMsg);
+                        currentEndpoint.setLastResponseHeaders("");
+                        currentEndpoint.setLastResponseFormat("TEXT");
+
+                        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                        if (state != null) {
+                            state.saveEndpoint(currentEndpoint);
+                        }
+                    }
                     sendBtn.setEnabled(true);
                 });
             }
