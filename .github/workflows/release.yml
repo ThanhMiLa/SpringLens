@@ -55,7 +55,7 @@ jobs:
 
       # 7. Create or Update GitHub Release
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: build/distributions/*.zip
           generate_release_notes: true
