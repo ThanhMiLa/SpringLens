@@ -2,37 +2,30 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
-        <h2>What is SpringLens?</h2>
         <p>
-            <b>SpringLens</b> is a blazing-fast, zero-configuration RESTful API testing client integrated natively into IntelliJ IDEA. Designed specifically for Spring Boot and Spring Cloud microservices, it enables developers to test, debug, and manage APIs directly inside the IDE without context-switching.
+            <b>SpringLens</b> is a lightweight, zero-configuration RESTful API testing client seamlessly integrated into IntelliJ IDEA. Designed specifically for Spring Boot and Spring Cloud developers, it allows you to test, debug, and manage APIs directly within your IDE without switching between external tools.
         </p>
 
-        <h3>Key Capabilities</h3>
+        <h3>Key Features</h3>
         <ul>
-            <li><b>🔍 Deep AST/PSI Endpoint Scanner:</b> Automatically discovers and indexes all <code>@RestController</code> endpoints across all project modules in real-time.</li>
-            <li><b>⚡ Instant DTO Schema Sync:</b> Generates mock JSON request bodies directly from Java DTO classes, POJOs, and Records with circular loop protection.</li>
-            <li><b>🌐 Spring Cloud Gateway Ready:</b> Auto-detects Gateway routes, computes reverse routing (<code>StripPrefix</code>, <code>PrefixPath</code>, <code>RewritePath</code>), and preserves service <code>context-path</code>.</li>
-            <li><b>🔑 Global Auth Sharing:</b> Set Bearer JWT tokens or API Keys once and sync to all project endpoints in one click (<i>"Apply to All APIs"</i>).</li>
-            <li><b>📁 Custom Collections:</b> Create custom folders and manual HTTP requests to test external APIs or webhooks alongside project APIs.</li>
-            <li><b>🔒 Dev-Friendly Local SSL:</b> Built-in Trust-All SSL handler for local microservices running on self-signed <code>https://localhost</code> certificates.</li>
-            <li><b>💾 State Persistence:</b> Automatically saves request params, custom headers, and payloads per-project across IDE restarts.</li>
-            <li><b>📋 Instant cURL Export:</b> One-click copy for ready-to-run <code>curl</code> commands for terminal testing and team sharing.</li>
+            <li><b>Deep AST/PSI Endpoint Scanner:</b> Automatically discovers and indexes all <code>@RestController</code> endpoints across all project modules in real-time.</li>
+            <li><b>Instant DTO Schema Sync:</b> Generates mock JSON request bodies directly from Java DTO classes, POJOs, and Records with recursive reference protection.</li>
+            <li><b>Spring Cloud Gateway Support:</b> Automatically resolves Gateway routing rules (<code>StripPrefix</code>, <code>PrefixPath</code>, <code>RewritePath</code>) and microservice context paths.</li>
+            <li><b>Global Authentication Sharing:</b> Configure Bearer JWT tokens or custom auth headers once and sync them across all endpoints with a single click.</li>
+            <li><b>Custom Collections & Requests:</b> Create manual requests and custom folders alongside scanned project endpoints for external API testing.</li>
+            <li><b>Dev-Friendly SSL:</b> Built-in Trust-All SSL handler for local microservices running on self-signed HTTPS certificates.</li>
+            <li><b>Workspace Persistence:</b> Automatically saves query parameters, headers, and request payloads per project across IDE restarts.</li>
+            <li><b>Instant cURL Export:</b> Copy formatted cURL commands instantly for terminal execution and team collaboration.</li>
         </ul>
-
-        <h3>Quick Start</h3>
-        <ol>
-            <li>Open any Spring Boot project in IntelliJ IDEA.</li>
-            <li>Click the <b>SpringLens</b> icon on the right tool window bar.</li>
-            <li>Select an endpoint from the tree, customize parameters or payload, and hit <b>Send</b>!</li>
-        </ol>
 
         <h3>Compatibility</h3>
         <p>
-            • <b>Spring Framework:</b> 5.x, 6.x | <b>Spring Boot:</b> 2.x, 3.x<br/>
+            • <b>Spring Framework:</b> 5.x, 6.x<br/>
+            • <b>Spring Boot:</b> 2.x, 3.x<br/>
             • <b>Spring Cloud:</b> Gateway, Eureka, Consul<br/>
             • <b>Languages:</b> Java 17+, Kotlin | <b>Build Tools:</b> Maven, Gradle
         </p>
@@ -40,7 +33,7 @@
         <h3>Useful Links</h3>
         <p>
             • <a href="https://github.com/ThanhMiLa/SpringLens">GitHub Repository</a><br/>
-            • <a href="https://github.com/ThanhMiLa/SpringLens/issues">Report an Issue / Feature Request</a><br/>
+            • <a href="https://github.com/ThanhMiLa/SpringLens/issues">Issue Tracker</a><br/>
             • <a href="https://github.com/ThanhMiLa/SpringLens/blob/main/CHANGELOG.md">Changelog</a>
         </p>
     ]]></description>

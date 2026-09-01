@@ -2,6 +2,20 @@
 
 # SpringLens Changelog
 
+## [1.1.0] - 2026-09-01
+
+### Added
+- **Interactive Security Lock Badges:** Added visual lock/unlock status indicators in the Endpoint Navigator, allowing developers to manually toggle an endpoint's security requirement with a single click.
+- **Response History & Snapshot Persistence:** Automatically preserves and restores the latest HTTP response body, status code, and latency metrics across IDE restarts for seamless workflow resumption.
+- **Global Cache Management:** Added a dedicated **"Clear Cache"** action to reset all stored response history, temporary inputs, and workspace cache instantly.
+
+### Changed
+- **Enhanced UI Showcase & Media Assets:** Refreshed high-resolution screenshots and optimized animated demo GIF.
+- **Responsive Description Layout:** Optimized overview formatting for 100% responsiveness across all IntelliJ IDE window sizes and theme modes.
+
+### Fixed
+- **Intelligent Endpoint Security Detection:** Refined AST/PSI static code analysis algorithms to accurately classify Public vs. Protected/Private endpoints based on Spring Security configurations and method annotations.
+
 ## [1.0.0] - 2026-08-30
 
 ### Added

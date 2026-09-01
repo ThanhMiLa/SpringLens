@@ -4,7 +4,7 @@
 ### Spring Boot RESTful API Tester for IntelliJ IDEA
 
 [![Build](https://github.com/ThanhMiLa/SpringLens/actions/workflows/build.yml/badge.svg)](https://github.com/ThanhMiLa/SpringLens/actions)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/ThanhMiLa/SpringLens/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/ThanhMiLa/SpringLens/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](./LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.x%20%7C%203.x-6DB33F.svg)](https://spring.io/projects/spring-boot)
@@ -42,17 +42,17 @@ SpringLens automatically scans your project to organize all endpoints into an in
 
 ## Screenshots
 
-### 1. Tool Window Overview
-![Tool Window Overview](./docs/images/01_fullscreen.png)
+### 1. IDE Integration & Workspace Overview
+![IDE Integration & Workspace Overview](./docs/images/fullscreen.png)
 
-### 2. Endpoint Tree & Security Status
-![Endpoint Tree & Security Status](./docs/images/02_list_endpoint.png)
+### 2. Request Body & Response Viewer
+![Request Body & Response Viewer](./docs/images/request_body.png)
 
-### 3. Request Body & Response Viewer
-![Request Body & Response Viewer](./docs/images/03_request_and_response.png)
+### 3. Query & Path Parameters
+![Query & Path Parameters](./docs/images/request_param.png)
 
-### 4. Query & Path Parameters
-![Query & Path Parameters](./docs/images/04_request_param.png)
+### 4. Endpoint Explorer & Security Status
+![Endpoint Explorer & Security Status](./docs/images/endpoints.png)
 
 ---
 
@@ -64,7 +64,7 @@ SpringLens automatically scans your project to organize all endpoints into an in
 3. Click **Install** and restart the IDE.
 
 ### Option B: Install from Disk (.zip)
-1. Download `SpringLens-1.0.0.zip` from [GitHub Releases](https://github.com/ThanhMiLa/SpringLens/releases).
+1. Download `SpringLens-1.1.0.zip` from [GitHub Releases](https://github.com/ThanhMiLa/SpringLens/releases).
 2. Go to **Settings** > **Plugins** > click the Settings icon > **Install Plugin from Disk...**.
 3. Select the downloaded `.zip` file and restart IntelliJ IDEA.
 
@@ -74,7 +74,7 @@ git clone https://github.com/ThanhMiLa/SpringLens.git
 cd SpringLens
 ./gradlew buildPlugin
 ```
-The packaged plugin will be available at `build/distributions/SpringLens-1.0.0.zip`.
+The packaged plugin will be available at `build/distributions/SpringLens-1.1.0.zip`.
 
 ---
 

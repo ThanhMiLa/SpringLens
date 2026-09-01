@@ -22,8 +22,6 @@ jobs:
       # 1. Fetch Sources
       - name: Fetch Sources
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
 
       # 2. Setup Java 21
       - name: Setup Java
