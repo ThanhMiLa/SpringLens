@@ -21,7 +21,7 @@ jobs:
     steps:
       # 1. Fetch Sources
       - name: Fetch Sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 2. Setup Java 21
       - name: Setup Java
