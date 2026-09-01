@@ -2,6 +2,14 @@
 
 # SpringLens Changelog
 
+## [1.1.1] - 2026-09-01
+
+### Fixed
+- **Gateway Endpoint Navigation & Lag:** Fixed single-URL fixation and UI freezes when selecting endpoints in Gateway mode by caching `GatewayConfig` in memory and resolving routing asynchronously.
+- **Constant Array Resolution for Public APIs:** Upgraded AST scanner (`SecurityConfigScanner`) to recursively resolve variable references such as `String[] PUBLIC_ENDPOINTS`, `List.of(...)`, and `Arrays.asList(...)` in `requestMatchers(...).permitAll()`.
+- **IntelliJ 2025.2+ Threading Assertions:** Wrapped project file index access in `runReadAction` to prevent background thread assertion exceptions during endpoint reload.
+- **Microservices Routing Matching:** Added case-insensitive matching for microservice route IDs, module names, and support for `lb://` service discovery URIs.
+
 ## [1.1.0] - 2026-09-01
 
 ### Added

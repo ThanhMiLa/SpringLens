@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
@@ -39,15 +39,18 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>1.0.0 — Initial Stable Release</h3>
+        <h3>1.1.1 — Microservices & Security Scanner Improvements</h3>
         <ul>
-            <li><b>Smart AST Endpoint Scanner:</b> Automatically discovers all Spring Boot REST endpoints across all project modules.</li>
-            <li><b>DTO Schema Generator:</b> Instant dummy JSON template generation from Java DTO classes with loop detection and smart merge.</li>
-            <li><b>Spring Cloud Gateway Support:</b> Intelligent URL calculation for microservices routing with StripPrefix, PrefixPath, and context-path retention.</li>
-            <li><b>Authentication Manager:</b> Bearer Token, Basic Auth, and API Key support with one-click "Apply to All APIs" global synchronization.</li>
-            <li><b>Postman-Style Native UI:</b> Soft word wrapping, colorful HTTP method badges, response formatting, and cURL export.</li>
-            <li><b>Trust-All SSL for Dev:</b> Seamless local HTTPS testing without SSLHandshakeException errors.</li>
-            <li><b>State Persistence:</b> Automatically preserves parameter inputs and testing history across IDE restarts.</li>
+            <li><b>Gateway Performance & URL Sync:</b> Cached Gateway configuration in memory to eliminate UI freezes on endpoint navigation and resolved single-URL fixation in Gateway mode.</li>
+            <li><b>Constant & Variable Array Resolution:</b> Upgraded static AST scanner to recursively resolve variables, constant arrays (e.g. <code>PUBLIC_ENDPOINTS</code>), and <code>List.of(...)</code> in Spring Security <code>permitAll()</code> definitions.</li>
+            <li><b>IntelliJ 2025.2+ Threading Compatibility:</b> Fixed background indexing assertion errors and added automatic scanning on project indexing completion.</li>
+            <li><b>Flexible Microservice Route Matching:</b> Case-insensitive matching for microservice route IDs, prefixes, and <code>lb://</code> URIs.</li>
+        </ul>
+        <h3>1.1.0 — Security Badges & Cache Management</h3>
+        <ul>
+            <li><b>Interactive Security Lock Badges:</b> Visual lock/unlock toggle indicators for endpoint authentication requirements.</li>
+            <li><b>Response History & Persistence:</b> Preserves latest response metrics and payload snapshots across IDE sessions.</li>
+            <li><b>Global Cache Reset:</b> One-click Clear Cache utility for stored endpoints and workspace history.</li>
         </ul>
     ]]></change-notes>
 
