@@ -140,4 +140,9 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         endpoint.setLastResponseHeaders(saved.lastResponseHeaders);
         endpoint.setLastResponseFormat(saved.lastResponseFormat);
     }
+    public void clearAllData() {
+        this.endpoints.clear();
+        this.manualFolders.clear();
+        this.manualEndpoints.clear();
+    }
 }

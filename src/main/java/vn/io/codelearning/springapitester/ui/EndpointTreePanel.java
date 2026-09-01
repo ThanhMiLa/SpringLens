@@ -61,8 +61,32 @@ public class EndpointTreePanel extends JPanel {
                 updateEndpoints(this.currentEndpoints);
             }
         });
+        JButton clearBtn = new JButton("🗑");
+        clearBtn.setToolTipText("Clear all cached data and collections");
+        clearBtn.addActionListener(e -> {
+            int result = com.intellij.openapi.ui.Messages.showYesNoDialog(
+                    project,
+                    "Are you sure you want to clear all cached data, including manual collections, request bodies, and responses? This action cannot be undone.",
+                    "Clear All Data",
+                    "Clear",
+                    "Cancel",
+                    com.intellij.openapi.ui.Messages.getWarningIcon()
+            );
+            if (result == com.intellij.openapi.ui.Messages.YES) {
+                if (this.onEndpointSelected != null) {
+                    this.onEndpointSelected.accept(null); // Clear panel first, which saves the current endpoint
+                }
+                vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                if (state != null) {
+                    state.clearAllData(); // Then wipe everything, including the one we just saved
+                }
+                // Xóa sạch danh sách hiển thị trên UI, không quét lại
+                updateEndpoints(new java.util.ArrayList<>());
+            }
+        });
         
         actionPanel.add(addBtn);
+        actionPanel.add(clearBtn);
         actionPanel.add(reloadBtn);
         
         topPanel.add(actionPanel, BorderLayout.EAST);

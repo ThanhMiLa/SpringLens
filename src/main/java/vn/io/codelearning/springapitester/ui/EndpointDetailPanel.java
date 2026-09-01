@@ -387,6 +387,17 @@ public class EndpointDetailPanel extends JPanel {
             try {
                 methodComboBox.setSelectedItem(vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
                 urlField.setText("");
+                paramPanel.setParameters(new java.util.ArrayList<>());
+                formDataPanel.setParameters(new java.util.ArrayList<>());
+                headerPanel.setHeaders(new java.util.ArrayList<>());
+                authPanel.setAuthConfig(new vn.io.codelearning.springapitester.model.AuthConfig());
+                authPanel.setSecuredStatus(false);
+                ApplicationManager.getApplication().runWriteAction(() -> {
+                    requestBodyEditor.getDocument().setText("");
+                    responseBodyEditor.getDocument().setText("");
+                });
+                responseHeadersArea.setText("");
+                statusLabel.setText("Ready");
             } finally {
                 isUpdatingUI = false;
             }
