@@ -9,13 +9,11 @@
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.x%20%7C%203.x-6DB33F.svg)](https://spring.io/projects/spring-boot)
 
----
 
 ![SpringLens Live Demo](./docs/images/demo.gif)
 
 </div>
 
----
 
 ## Overview
 
@@ -23,7 +21,6 @@
 
 SpringLens automatically scans your project to organize all endpoints into an intuitive tree, generates mock JSON request bodies from your DTOs, effortlessly handles Spring Cloud Gateway routing, and provides one-click authentication sharing — delivering a complete, Postman-grade testing experience right where you code.
 
----
 
 ## Key Features
 
@@ -38,7 +35,6 @@ SpringLens automatically scans your project to organize all endpoints into an in
 | **Workspace State Persistence** | Preserves all custom headers, parameters, and request bodies per-project across IDE restarts. |
 | **Instant cURL Export** | One-click copy for ready-to-run `curl` commands for terminal testing and team collaboration. |
 
----
 
 ## Screenshots
 
@@ -54,7 +50,6 @@ SpringLens automatically scans your project to organize all endpoints into an in
 ### 4. Endpoint Explorer & Security Status
 ![Endpoint Explorer & Security Status](./docs/images/endpoints.png)
 
----
 
 ## Installation
 
@@ -76,13 +71,11 @@ cd SpringLens
 ```
 The packaged plugin will be available at `build/distributions/SpringLens-1.1.0.zip`.
 
----
 
 ## License
 
 SpringLens is under the Apache 2.0 license. See the [Apache License 2.0](./LICENSE) file for details.
 
----
 
 *Plugin based on the [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)*
 
