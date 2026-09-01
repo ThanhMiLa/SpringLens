@@ -32,18 +32,16 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
         // Need an array trick to let the lambda reference the treePanel
         final EndpointTreePanel[] treePanelHolder = new EndpointTreePanel[1];
 
-        treePanelHolder[0] = new EndpointTreePanel(project, 
-            endpoint -> {
-                // When an endpoint is selected
-                detailPanel.displayEndpoint(endpoint);
-            },
-            () -> {
-                // When Reload is clicked
-                com.intellij.openapi.progress.ProgressManager.getInstance().run(new com.intellij.openapi.progress.Task.Backgroundable(project, "Scanning Spring Endpoints...", true) {
+        Runnable reloadTask = () -> {
+            com.intellij.openapi.progress.ProgressManager.getInstance().run(
+                new com.intellij.openapi.progress.Task.Backgroundable(project, "Scanning Spring Endpoints...", true) {
                     @Override
                     public void run(@NotNull com.intellij.openapi.progress.ProgressIndicator indicator) {
                         List<EndpointModel> scannedEndpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
-                        
+                        vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig gatewayConfig = 
+                                vn.io.codelearning.springapitester.util.GatewayConfigReader.findGatewayConfig(project);
+                        String defaultBaseUrl = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
+
                         // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
                         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
                         if (state != null) {
@@ -52,14 +50,28 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                             }
                         }
                         
-                        // Update Tree on EDT
+                        // Update Tree and DetailPanel on EDT
                         com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                            if (project.isDisposed()) return;
+                            detailPanel.setGatewayConfig(gatewayConfig);
+                            detailPanel.setDefaultBaseUrl(defaultBaseUrl);
                             endpoints = scannedEndpoints;
-                            treePanelHolder[0].updateEndpoints(endpoints);
+                            if (treePanelHolder[0] != null) {
+                                treePanelHolder[0].updateEndpoints(endpoints);
+                            }
+                            detailPanel.refreshEndpoint();
                         });
                     }
-                });
-            }
+                }
+            );
+        };
+
+        treePanelHolder[0] = new EndpointTreePanel(project, 
+            endpoint -> {
+                // When an endpoint is selected
+                detailPanel.displayEndpoint(endpoint);
+            },
+            reloadTask
         );
         
         treePanelHolder[0].setOnModeChanged(() -> {
@@ -99,5 +111,8 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
         ContentFactory contentFactory = ContentFactory.getInstance();
         Content content = contentFactory.createContent(mainSplitter, "", false);
         toolWindow.getContentManager().addContent(content);
+
+        // Auto-scan when project is smart (indexes ready)
+        com.intellij.openapi.project.DumbService.getInstance(project).runWhenSmart(reloadTask);
     }
 }

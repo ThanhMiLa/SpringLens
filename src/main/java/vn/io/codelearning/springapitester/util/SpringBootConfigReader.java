@@ -1,6 +1,8 @@
 package vn.io.codelearning.springapitester.util;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -28,13 +30,38 @@ public class SpringBootConfigReader {
     }
 
     public static AppConfig extractAppConfig(Project project) {
-        return extractConfigFromScope(project, GlobalSearchScope.projectScope(project));
+        if (project == null || project.isDisposed()) return new AppConfig("http://localhost:8080", "");
+        try {
+            if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+                return extractConfigFromScope(project, GlobalSearchScope.projectScope(project));
+            } else {
+                return ApplicationManager.getApplication().runReadAction(
+                    (Computable<AppConfig>) () -> extractConfigFromScope(project, GlobalSearchScope.projectScope(project))
+                );
+            }
+        } catch (Throwable t) {
+            return new AppConfig("http://localhost:8080", "");
+        }
     }
 
     public static AppConfig extractAppConfig(Project project, com.intellij.openapi.module.Module module) {
-        if (module == null) return extractAppConfig(project);
-        GlobalSearchScope scope = GlobalSearchScope.moduleRuntimeScope(module, false);
-        return extractConfigFromScope(project, scope);
+        if (project == null || project.isDisposed()) return new AppConfig("http://localhost:8080", "");
+        if (module == null || module.isDisposed()) return extractAppConfig(project);
+        try {
+            if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+                GlobalSearchScope scope = GlobalSearchScope.moduleRuntimeScope(module, false);
+                return extractConfigFromScope(project, scope);
+            } else {
+                return ApplicationManager.getApplication().runReadAction(
+                    (Computable<AppConfig>) () -> {
+                        GlobalSearchScope scope = GlobalSearchScope.moduleRuntimeScope(module, false);
+                        return extractConfigFromScope(project, scope);
+                    }
+                );
+            }
+        } catch (Throwable t) {
+            return new AppConfig("http://localhost:8080", "");
+        }
     }
     
     public static String extractBaseUrl(Project project) {
@@ -50,38 +77,42 @@ public class SpringBootConfigReader {
         String[] contextPath = {""};
         String[] appName = {""};
 
-        Collection<VirtualFile> ymlFiles = FilenameIndex.getAllFilesByExt(project, "yml", scope);
-        Collection<VirtualFile> yamlFiles = FilenameIndex.getAllFilesByExt(project, "yaml", scope);
-        Collection<VirtualFile> propFiles = FilenameIndex.getAllFilesByExt(project, "properties", scope);
+        try {
+            Collection<VirtualFile> ymlFiles = FilenameIndex.getAllFilesByExt(project, "yml", scope);
+            Collection<VirtualFile> yamlFiles = FilenameIndex.getAllFilesByExt(project, "yaml", scope);
+            Collection<VirtualFile> propFiles = FilenameIndex.getAllFilesByExt(project, "properties", scope);
 
-        // Process properties
-        for (VirtualFile vf : propFiles) {
-            if (vf.getName().startsWith("application") || vf.getName().startsWith("bootstrap")) {
-                try (InputStream is = vf.getInputStream()) {
-                    Properties props = new Properties();
-                    props.load(is);
-                    if (props.containsKey("server.port")) {
-                        port[0] = resolvePlaceholders(props.getProperty("server.port"), port[0]);
-                    }
-                    if (props.containsKey("server.servlet.context-path")) {
-                        contextPath[0] = props.getProperty("server.servlet.context-path");
-                    }
-                    if (props.containsKey("spring.application.name")) {
-                        appName[0] = props.getProperty("spring.application.name");
-                    }
-                } catch (Exception e) {}
+            // Process properties
+            for (VirtualFile vf : propFiles) {
+                if (vf.getName().startsWith("application") || vf.getName().startsWith("bootstrap")) {
+                    try (InputStream is = vf.getInputStream()) {
+                        Properties props = new Properties();
+                        props.load(is);
+                        if (props.containsKey("server.port")) {
+                            port[0] = resolvePlaceholders(props.getProperty("server.port"), port[0]);
+                        }
+                        if (props.containsKey("server.servlet.context-path")) {
+                            contextPath[0] = props.getProperty("server.servlet.context-path");
+                        }
+                        if (props.containsKey("spring.application.name")) {
+                            appName[0] = props.getProperty("spring.application.name");
+                        }
+                    } catch (Throwable t) {}
+                }
             }
-        }
 
-        // Process YAML
-        Yaml yaml = new Yaml();
-        List<VirtualFile> yamlAll = new ArrayList<>();
-        yamlAll.addAll(ymlFiles);
-        yamlAll.addAll(yamlFiles);
-        for (VirtualFile vf : yamlAll) {
-            if (vf.getName().startsWith("application") || vf.getName().startsWith("bootstrap")) {
-                parseYamlConfig(vf, yaml, ref -> port[0] = ref[0], ref -> contextPath[0] = ref[0], ref -> appName[0] = ref[0]);
+            // Process YAML
+            Yaml yaml = new Yaml();
+            List<VirtualFile> yamlAll = new ArrayList<>();
+            yamlAll.addAll(ymlFiles);
+            yamlAll.addAll(yamlFiles);
+            for (VirtualFile vf : yamlAll) {
+                if (vf.getName().startsWith("application") || vf.getName().startsWith("bootstrap")) {
+                    parseYamlConfig(vf, yaml, ref -> port[0] = ref[0], ref -> contextPath[0] = ref[0], ref -> appName[0] = ref[0]);
+                }
             }
+        } catch (Throwable t) {
+            // ignore
         }
 
         String cPath = contextPath[0];

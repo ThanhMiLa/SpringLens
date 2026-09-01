@@ -91,12 +91,43 @@ public class SecurityConfigScanner {
         }
 
         // Parse path strings
+        Set<PsiElement> visited = new HashSet<>();
         for (int i = startIndex; i < args.length; i++) {
-            PsiExpression arg = args[i];
-            if (arg instanceof PsiLiteralExpression) {
-                Object value = ((PsiLiteralExpression) arg).getValue();
-                if (value instanceof String) {
-                    rules.add(new PublicSecurityRule((String) value, method));
+            extractStringsFromExpression(args[i], rules, method, visited);
+        }
+    }
+
+    private static void extractStringsFromExpression(PsiExpression expr, List<PublicSecurityRule> rules, HttpMethodEnum method, Set<PsiElement> visited) {
+        if (expr == null || !visited.add(expr)) return;
+
+        if (expr instanceof PsiLiteralExpression) {
+            Object value = ((PsiLiteralExpression) expr).getValue();
+            if (value instanceof String) {
+                rules.add(new PublicSecurityRule((String) value, method));
+            }
+        } else if (expr instanceof PsiReferenceExpression) {
+            PsiElement resolved = ((PsiReferenceExpression) expr).resolve();
+            if (resolved instanceof PsiVariable) {
+                PsiExpression initializer = ((PsiVariable) resolved).getInitializer();
+                if (initializer != null) {
+                    extractStringsFromExpression(initializer, rules, method, visited);
+                }
+            }
+        } else if (expr instanceof PsiArrayInitializerExpression) {
+            for (PsiExpression child : ((PsiArrayInitializerExpression) expr).getInitializers()) {
+                extractStringsFromExpression(child, rules, method, visited);
+            }
+        } else if (expr instanceof PsiNewExpression) {
+            PsiArrayInitializerExpression arrayInitializer = ((PsiNewExpression) expr).getArrayInitializer();
+            if (arrayInitializer != null) {
+                extractStringsFromExpression(arrayInitializer, rules, method, visited);
+            }
+        } else if (expr instanceof PsiMethodCallExpression) {
+            PsiMethodCallExpression call = (PsiMethodCallExpression) expr;
+            String methodName = call.getMethodExpression().getReferenceName();
+            if ("of".equals(methodName) || "asList".equals(methodName)) {
+                for (PsiExpression arg : call.getArgumentList().getExpressions()) {
+                    extractStringsFromExpression(arg, rules, method, visited);
                 }
             }
         }

@@ -48,7 +48,8 @@ public class EndpointDetailPanel extends JPanel {
     private JBTabbedPane requestTabs;
 
     // Default local base URL for testing
-    private String baseUrl;
+    private String baseUrl = "http://localhost:8080";
+    private vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig cachedGatewayConfig;
     
     private Runnable onEndpointUpdated;
     private java.util.function.Consumer<vn.io.codelearning.springapitester.model.AuthConfig> onApplyToAllAuth;
@@ -63,11 +64,44 @@ public class EndpointDetailPanel extends JPanel {
         this.onApplyToAllAuth = onApplyToAllAuth;
     }
 
+    public void setGatewayConfig(vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig gatewayConfig) {
+        this.cachedGatewayConfig = gatewayConfig;
+    }
+
+    public vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig getGatewayConfig() {
+        return this.cachedGatewayConfig;
+    }
+
+    public void setDefaultBaseUrl(String baseUrl) {
+        if (baseUrl != null && !baseUrl.isBlank()) {
+            this.baseUrl = baseUrl;
+        }
+    }
+
+    public void refreshGatewayConfigAsync() {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            try {
+                vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig config = 
+                        vn.io.codelearning.springapitester.util.GatewayConfigReader.findGatewayConfig(project);
+                String extractedBase = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (project.isDisposed()) return;
+                    this.cachedGatewayConfig = config;
+                    setDefaultBaseUrl(extractedBase);
+                });
+            } catch (Throwable t) {
+                // ignore
+            }
+        });
+    }
+
     public EndpointDetailPanel(Project project) {
         this.project = project;
-        this.baseUrl = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
         setLayout(new BorderLayout());
         setMinimumSize(new Dimension(100, 100));
+
+        // Asynchronously load initial base URL and gateway config
+        refreshGatewayConfigAsync();
 
         // 1. Top Bar
         JPanel topBar = new JPanel(new BorderLayout(5, 5));
@@ -413,73 +447,70 @@ public class EndpointDetailPanel extends JPanel {
             String effectiveBaseUrl = getEffectiveBaseUrl(endpoint);
             String fullUrl = effectiveBaseUrl + endpoint.getPath();
             urlField.setText(fullUrl.replace("//", "/").replace("http:/l", "http://l").replace("https:/l", "https://l"));
-        } finally {
-            isUpdatingUI = false;
-        }
 
-        paramPanel.setParameters(endpoint.getParameters());
-        formDataPanel.setParameters(endpoint.getParameters());
-        headerPanel.setHeaders(endpoint.getCustomHeaders());
-        authPanel.setAuthConfig(endpoint.getAuthConfig());
-        authPanel.setSecuredStatus(endpoint.isSecured());
+            paramPanel.setParameters(endpoint.getParameters());
+            formDataPanel.setParameters(endpoint.getParameters());
+            headerPanel.setHeaders(endpoint.getCustomHeaders());
+            authPanel.setAuthConfig(endpoint.getAuthConfig());
+            authPanel.setSecuredStatus(endpoint.isSecured());
 
-        String json = endpoint.getRequestBodyJson() != null ? endpoint.getRequestBodyJson() : "";
-        
-        // Set Body Type UI
-        if (endpoint.getBodyType() == vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA) {
-            formRadio.setSelected(true);
-            ((CardLayout) bodyCards.getLayout()).show(bodyCards, "FORM_DATA");
-            syncBtn.setVisible(false);
-        } else {
-            jsonRadio.setSelected(true);
-            ((CardLayout) bodyCards.getLayout()).show(bodyCards, "JSON");
-            syncBtn.setVisible(true);
-        }
+            String json = endpoint.getRequestBodyJson() != null ? endpoint.getRequestBodyJson() : "";
+            
+            // Set Body Type UI
+            if (endpoint.getBodyType() == vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA) {
+                formRadio.setSelected(true);
+                ((CardLayout) bodyCards.getLayout()).show(bodyCards, "FORM_DATA");
+                syncBtn.setVisible(false);
+            } else {
+                jsonRadio.setSelected(true);
+                ((CardLayout) bodyCards.getLayout()).show(bodyCards, "JSON");
+                syncBtn.setVisible(true);
+            }
 
-        // Restore or Reset Cached Response
-        String respBody = endpoint.getLastResponseBody() != null ? endpoint.getLastResponseBody() : "";
-        String respHeaders = endpoint.getLastResponseHeaders() != null ? endpoint.getLastResponseHeaders() : "";
-        String respFormat = (endpoint.getLastResponseFormat() != null && !endpoint.getLastResponseFormat().isBlank()) 
-                ? endpoint.getLastResponseFormat() 
-                : "JSON";
+            // Restore or Reset Cached Response
+            String respBody = endpoint.getLastResponseBody() != null ? endpoint.getLastResponseBody() : "";
+            String respHeaders = endpoint.getLastResponseHeaders() != null ? endpoint.getLastResponseHeaders() : "";
+            String respFormat = (endpoint.getLastResponseFormat() != null && !endpoint.getLastResponseFormat().isBlank()) 
+                    ? endpoint.getLastResponseFormat() 
+                    : "JSON";
 
-        isUpdatingUI = true;
-        try {
             if (!respFormat.equals(responseLanguageCombo.getSelectedItem())) {
                 responseLanguageCombo.setSelectedItem(respFormat);
             }
+
+            // Safely update editor document
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                requestBodyEditor.getDocument().setText(json);
+                responseBodyEditor.getDocument().setText(respBody);
+            });
+
+            responseHeadersArea.setText(respHeaders);
+
+            // Update status label
+            if (endpoint.getLastResponseStatusCode() > 0) {
+                int code = endpoint.getLastResponseStatusCode();
+                String colorHex = "#7A7A7A"; // Default gray
+                if (code >= 200 && code < 300) colorHex = "#5CB85C"; // Green
+                else if (code >= 300 && code < 400) colorHex = "#5BC0DE"; // Cyan
+                else if (code >= 400 && code < 600) colorHex = "#D9534F"; // Red
+
+                String msg = endpoint.getLastResponseStatusMessage();
+                if (msg == null || msg.isBlank()) {
+                    msg = getHttpStatusMessage(code);
+                }
+
+                String html = String.format("<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span><font color='gray'> &nbsp; %d ms</font></html>", 
+                                            colorHex, code, msg, endpoint.getLastResponseTimeTakenMs());
+                statusLabel.setText(html);
+            } else if (endpoint.getLastResponseStatusMessage() != null && !endpoint.getLastResponseStatusMessage().isBlank()) {
+                statusLabel.setText(endpoint.getLastResponseStatusMessage());
+            } else {
+                statusLabel.setText("Ready");
+            }
+        } catch (Throwable t) {
+            // Safe fallback to prevent broken UI state
         } finally {
             isUpdatingUI = false;
-        }
-
-        // Safely update editor document
-        ApplicationManager.getApplication().runWriteAction(() -> {
-            requestBodyEditor.getDocument().setText(json);
-            responseBodyEditor.getDocument().setText(respBody);
-        });
-
-        responseHeadersArea.setText(respHeaders);
-
-        // Update status label
-        if (endpoint.getLastResponseStatusCode() > 0) {
-            int code = endpoint.getLastResponseStatusCode();
-            String colorHex = "#7A7A7A"; // Default gray
-            if (code >= 200 && code < 300) colorHex = "#5CB85C"; // Green
-            else if (code >= 300 && code < 400) colorHex = "#5BC0DE"; // Cyan
-            else if (code >= 400 && code < 600) colorHex = "#D9534F"; // Red
-
-            String msg = endpoint.getLastResponseStatusMessage();
-            if (msg == null || msg.isBlank()) {
-                msg = getHttpStatusMessage(code);
-            }
-
-            String html = String.format("<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span><font color='gray'> &nbsp; %d ms</font></html>", 
-                                        colorHex, code, msg, endpoint.getLastResponseTimeTakenMs());
-            statusLabel.setText(html);
-        } else if (endpoint.getLastResponseStatusMessage() != null && !endpoint.getLastResponseStatusMessage().isBlank()) {
-            statusLabel.setText(endpoint.getLastResponseStatusMessage());
-        } else {
-            statusLabel.setText("Ready");
         }
     }
 
@@ -728,21 +759,19 @@ public class EndpointDetailPanel extends JPanel {
     }
 
     private String getEffectiveBaseUrl(EndpointModel endpoint) {
-        if (endpoint == null) return baseUrl;
-        if (endpoint.isManual()) return baseUrl;
+        if (endpoint == null) return baseUrl != null ? baseUrl : "http://localhost:8080";
+        if (endpoint.isManual()) return baseUrl != null ? baseUrl : "http://localhost:8080";
         
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
-        if (state != null && state.gatewayModeEnabled) {
-            com.intellij.openapi.module.Module[] modules = com.intellij.openapi.module.ModuleManager.getInstance(project).getModules();
-            for (com.intellij.openapi.module.Module m : modules) {
-                vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig config = vn.io.codelearning.springapitester.util.GatewayConfigReader.parseGatewayConfig(project, m);
-                if (config != null) {
-                    String[] parts = vn.io.codelearning.springapitester.util.GatewayUrlCalculator.calculateFull(endpoint, config);
-                    return parts[0]; // Returns effective base
-                }
+        if (state != null && state.gatewayModeEnabled && cachedGatewayConfig != null) {
+            String[] parts = vn.io.codelearning.springapitester.util.GatewayUrlCalculator.calculateFull(endpoint, cachedGatewayConfig);
+            if (parts != null && parts.length > 0 && parts[0] != null && !parts[0].isBlank()) {
+                return parts[0];
             }
         }
-        return endpoint.getDirectBaseUrl() != null ? endpoint.getDirectBaseUrl() : baseUrl;
+        return endpoint.getDirectBaseUrl() != null && !endpoint.getDirectBaseUrl().isBlank() 
+                ? endpoint.getDirectBaseUrl() 
+                : (baseUrl != null ? baseUrl : "http://localhost:8080");
     }
 
     private void updateMethodComboColor(vn.io.codelearning.springapitester.model.HttpMethodEnum method) {

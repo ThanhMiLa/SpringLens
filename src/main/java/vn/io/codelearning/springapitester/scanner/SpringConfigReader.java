@@ -49,19 +49,37 @@ public final class SpringConfigReader {
             return config;
         }
 
-        GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
-
-        // Bước 1: Đọc base config trước
-        for (String filename : BASE_CONFIG_FILENAMES) {
-            parseConfigFile(filename, scope, config);
-        }
-
-        // Bước 2: Đọc profile config sau (ghi đè lên base nếu có giá trị)
-        for (String filename : PROFILE_CONFIG_FILENAMES) {
-            parseConfigFile(filename, scope, config);
+        try {
+            if (com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed()) {
+                doReadServerConfig(project, config);
+            } else {
+                com.intellij.openapi.application.ApplicationManager.getApplication().runReadAction(
+                    () -> doReadServerConfig(project, config)
+                );
+            }
+        } catch (Throwable t) {
+            // ignore
         }
 
         return config;
+    }
+
+    private static void doReadServerConfig(Project project, SpringServerConfig config) {
+        try {
+            GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
+
+            // Bước 1: Đọc base config trước
+            for (String filename : BASE_CONFIG_FILENAMES) {
+                parseConfigFile(filename, scope, config);
+            }
+
+            // Bước 2: Đọc profile config sau (ghi đè lên base nếu có giá trị)
+            for (String filename : PROFILE_CONFIG_FILENAMES) {
+                parseConfigFile(filename, scope, config);
+            }
+        } catch (Throwable t) {
+            // ignore
+        }
     }
 
     private static void parseConfigFile(String filename, GlobalSearchScope scope, SpringServerConfig config) {

@@ -291,12 +291,16 @@ public class EndpointTreePanel extends JPanel {
 
         // 2. Build Scanned Controllers
         if (endpoints != null && !endpoints.isEmpty()) {
-            com.intellij.openapi.module.Module[] modules = com.intellij.openapi.module.ModuleManager.getInstance(project).getModules();
             boolean hasGateway = false;
-            for (com.intellij.openapi.module.Module m : modules) {
-                if (vn.io.codelearning.springapitester.util.GatewayConfigReader.hasGatewayDependency(m)) {
-                    hasGateway = true; break;
+            try {
+                com.intellij.openapi.module.Module[] modules = com.intellij.openapi.module.ModuleManager.getInstance(project).getModules();
+                for (com.intellij.openapi.module.Module m : modules) {
+                    if (m != null && !m.isDisposed() && vn.io.codelearning.springapitester.util.GatewayConfigReader.hasGatewayDependency(m)) {
+                        hasGateway = true; break;
+                    }
                 }
+            } catch (Throwable t) {
+                // ignore
             }
             
             if (gatewayComboBox != null) {
