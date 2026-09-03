@@ -218,4 +218,77 @@ public class HttpRequestBuilderTest {
         endpoint.addParameter(cookie);
         HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api");
     }
+
+    @Test
+    public void testMultipartRealFileUploadAndMimeType() throws IOException {
+        java.io.File tempFile = java.io.File.createTempFile("sample", ".json");
+        tempFile.deleteOnExit();
+        java.nio.file.Files.writeString(tempFile.toPath(), "{\"hello\":\"world\"}");
+
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/upload", "UploadController", "com.example", "upload");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+
+        ParameterModel fileParam = new ParameterModel("file", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
+        fileParam.setCurrentValue(tempFile.getAbsolutePath());
+        endpoint.addParameter(fileParam);
+
+        Request request = HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/upload");
+        Assert.assertEquals("POST", request.method());
+        Assert.assertNotNull(request.body());
+        Assert.assertTrue(request.body().contentType().toString().startsWith("multipart/form-data"));
+
+        okio.Buffer buffer = new okio.Buffer();
+        request.body().writeTo(buffer);
+        String bodyContent = buffer.readUtf8();
+        Assert.assertTrue(bodyContent.contains("filename=\"" + tempFile.getName() + "\""));
+        Assert.assertTrue(bodyContent.contains("Content-Type: application/json"));
+        Assert.assertTrue(bodyContent.contains("{\"hello\":\"world\"}"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testMultipartMissingFileThrowsEarly() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/upload", "UploadController", "com.example", "upload");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+
+        ParameterModel fileParam = new ParameterModel("file", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
+        fileParam.setCurrentValue("/missing/file/path.txt");
+        endpoint.addParameter(fileParam);
+
+        HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/upload");
+    }
+
+    @Test
+    public void testMultipartMultipleFilesAndJsonPart() throws IOException {
+        java.io.File file1 = java.io.File.createTempFile("file1", ".txt");
+        file1.deleteOnExit();
+        java.nio.file.Files.writeString(file1.toPath(), "content 1");
+
+        java.io.File file2 = java.io.File.createTempFile("file2", ".txt");
+        file2.deleteOnExit();
+        java.nio.file.Files.writeString(file2.toPath(), "content 2");
+
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/batch-upload", "UploadController", "com.example", "batchUpload");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+
+        ParameterModel filesParam = new ParameterModel("files", ParamTypeEnum.MULTIPART_FILE, "MultipartFile[]");
+        filesParam.setCurrentValue(file1.getAbsolutePath() + ", " + file2.getAbsolutePath());
+
+        ParameterModel jsonPart = new ParameterModel("config", ParamTypeEnum.FORM_DATA, "ConfigDto");
+        jsonPart.setCurrentValue("{\"async\":true}");
+
+        endpoint.addParameter(filesParam);
+        endpoint.addParameter(jsonPart);
+
+        Request request = HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/batch-upload");
+        okio.Buffer buffer = new okio.Buffer();
+        request.body().writeTo(buffer);
+        String bodyContent = buffer.readUtf8();
+
+        Assert.assertTrue(bodyContent.contains(file1.getName()));
+        Assert.assertTrue(bodyContent.contains("content 1"));
+        Assert.assertTrue(bodyContent.contains(file2.getName()));
+        Assert.assertTrue(bodyContent.contains("content 2"));
+        Assert.assertTrue(bodyContent.contains("name=\"config\""));
+        Assert.assertTrue(bodyContent.contains("Content-Type: application/json"));
+    }
 }

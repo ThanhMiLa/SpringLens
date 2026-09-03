@@ -141,17 +141,35 @@ public class CurlBuilder {
         if (endpoint.getHttpMethod() != vn.io.codelearning.springapitester.model.HttpMethodEnum.GET) {
             if (endpoint.getBodyType() == RequestBodyType.FORM_DATA) {
                 for (ParameterModel param : endpoint.getParameters()) {
+                    if (!param.isEnabled()) continue;
                     if (param.getParamType() == ParamTypeEnum.FORM_DATA || 
                         param.getParamType() == ParamTypeEnum.MULTIPART_FILE ||
                         param.getParamType() == ParamTypeEnum.MODEL_ATTRIBUTE) {
                         
                         String key = param.getName();
-                        String val = param.getCurrentValue() != null ? param.getCurrentValue() : "";
+                        String val = RequestValidationUtil.resolveParamValue(param);
+                        if (param.isRequired() && val.trim().isEmpty()) {
+                            throw new IllegalArgumentException("Missing required form parameter: " + key);
+                        }
                         if (key != null && !key.isEmpty() && !val.trim().isEmpty()) {
                             if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
-                                curl.append(" \\\n  -F \"").append(key).append("=@").append(val).append("\"");
+                                java.util.List<java.io.File> files = RequestValidationUtil.parseFilePaths(val);
+                                if (files.isEmpty() && param.isRequired()) {
+                                    throw new IllegalArgumentException("Missing required file for parameter: " + key);
+                                }
+                                for (java.io.File file : files) {
+                                    if (!file.exists() || !file.isFile()) {
+                                        throw new IllegalArgumentException("File not found or not a valid file: " + file.getPath() + " for parameter: " + key);
+                                    }
+                                    String mime = RequestValidationUtil.detectMimeType(file);
+                                    curl.append(" \\\n  -F \"").append(key).append("=@").append(file.getAbsolutePath()).append(";type=").append(mime).append("\"");
+                                }
                             } else {
-                                curl.append(" \\\n  -F \"").append(key).append("=").append(val).append("\"");
+                                if (RequestValidationUtil.isJson(val)) {
+                                    curl.append(" \\\n  -F \"").append(key).append("=").append(val.replace("\"", "\\\"")).append(";type=application/json\"");
+                                } else {
+                                    curl.append(" \\\n  -F \"").append(key).append("=").append(val).append("\"");
+                                }
                             }
                         }
                     }

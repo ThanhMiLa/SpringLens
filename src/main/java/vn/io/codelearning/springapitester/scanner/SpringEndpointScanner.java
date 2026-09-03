@@ -297,6 +297,10 @@ public class SpringEndpointScanner {
                     explodedType = ParamTypeEnum.QUERY_PARAM;
                 }
                 
+                if (explodedType == ParamTypeEnum.FORM_DATA) {
+                    endpoint.setBodyType(vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA);
+                }
+                
                 // Đệ quy nhẹ lấy các field của ModelAttribute
                 PsiClass psiClass = extractPsiClass(parameter.getType());
                 if (psiClass != null && !psiClass.getQualifiedName().startsWith("java.")) {
@@ -307,8 +311,9 @@ public class SpringEndpointScanner {
                         String fieldName = field.getName();
                         String fieldType = field.getType().getPresentableText();
                         ParamTypeEnum actualFieldType = explodedType;
-                        if (fieldType.contains("MultipartFile")) {
+                        if (fieldType.contains("MultipartFile") || fieldType.contains("Part")) {
                             actualFieldType = ParamTypeEnum.MULTIPART_FILE;
+                            endpoint.setBodyType(vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA);
                         }
                         ParameterModel fieldModel = new ParameterModel(fieldName, actualFieldType, fieldType, "", false, "", "");
                         endpoint.addParameter(fieldModel);
@@ -319,7 +324,12 @@ public class SpringEndpointScanner {
                     endpoint.addParameter(paramModel);
                 }
             } else if (paramType == ParamTypeEnum.MULTIPART_FILE) {
-                ParameterModel paramModel = new ParameterModel(finalName, ParamTypeEnum.FORM_DATA, simpleType, defaultValue, required, "", "");
+                endpoint.setBodyType(vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA);
+                ParameterModel paramModel = new ParameterModel(finalName, ParamTypeEnum.MULTIPART_FILE, simpleType, defaultValue, required, "", "");
+                endpoint.addParameter(paramModel);
+            } else if (paramType == ParamTypeEnum.FORM_DATA) {
+                endpoint.setBodyType(vn.io.codelearning.springapitester.model.RequestBodyType.FORM_DATA);
+                ParameterModel paramModel = new ParameterModel(finalName, paramType, simpleType, defaultValue, required, "", "");
                 endpoint.addParameter(paramModel);
             } else {
                 ParameterModel paramModel = new ParameterModel(finalName, paramType, simpleType, defaultValue, required, "", "");

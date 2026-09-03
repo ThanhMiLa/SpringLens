@@ -31,24 +31,37 @@ public enum ParamTypeEnum {
         return userEditable;
     }
 
+    public static boolean isMultipartFileType(String typeFqn) {
+        if (typeFqn == null) return false;
+        return typeFqn.contains("MultipartFile")
+                || typeFqn.contains("jakarta.servlet.http.Part")
+                || typeFqn.contains("javax.servlet.http.Part");
+    }
+
     /**
      * Tự động nhận diện kiểu ParamType từ tên Annotation hoặc Kiểu dữ liệu Java.
      */
     public static ParamTypeEnum fromAnnotationOrType(String annotationName, String typeFqn) {
         if (annotationName != null && !annotationName.isBlank()) {
             if (annotationName.contains("PathVariable")) return PATH_VARIABLE;
-            if (annotationName.contains("RequestParam")) return QUERY_PARAM;
+            if (annotationName.contains("RequestParam")) {
+                if (isMultipartFileType(typeFqn)) return MULTIPART_FILE;
+                return QUERY_PARAM;
+            }
             if (annotationName.contains("RequestHeader")) return HEADER;
             if (annotationName.contains("CookieValue")) return COOKIE;
             if (annotationName.contains("RequestBody")) return REQUEST_BODY;
-            if (annotationName.contains("RequestPart")) return MULTIPART_FILE;
+            if (annotationName.contains("RequestPart")) {
+                if (typeFqn == null || isMultipartFileType(typeFqn)) return MULTIPART_FILE;
+                return FORM_DATA;
+            }
             if (annotationName.contains("ModelAttribute")) return MODEL_ATTRIBUTE;
             if (annotationName.contains("MatrixVariable")) return MATRIX_VARIABLE;
         }
 
         // Nhận diện theo kiểu dữ liệu đặc thù
         if (typeFqn != null && !typeFqn.isBlank()) {
-            if (typeFqn.contains("MultipartFile")) return MULTIPART_FILE;
+            if (isMultipartFileType(typeFqn)) return MULTIPART_FILE;
             if (typeFqn.contains("HttpServletRequest") ||
                     typeFqn.contains("HttpServletResponse") ||
                     typeFqn.contains("HttpSession") ||

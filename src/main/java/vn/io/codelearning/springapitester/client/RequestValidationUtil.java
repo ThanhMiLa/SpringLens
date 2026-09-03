@@ -75,4 +75,47 @@ public final class RequestValidationUtil {
         }
         return sb.toString();
     }
+
+    public static String detectMimeType(java.io.File file) {
+        if (file == null) return "application/octet-stream";
+        try {
+            String probe = java.nio.file.Files.probeContentType(file.toPath());
+            if (probe != null && !probe.isBlank()) {
+                return probe;
+            }
+        } catch (Throwable ignored) {
+        }
+        String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        if (name.endsWith(".gif")) return "image/gif";
+        if (name.endsWith(".pdf")) return "application/pdf";
+        if (name.endsWith(".json")) return "application/json";
+        if (name.endsWith(".xml")) return "application/xml";
+        if (name.endsWith(".txt")) return "text/plain";
+        if (name.endsWith(".csv")) return "text/csv";
+        if (name.endsWith(".html") || name.endsWith(".htm")) return "text/html";
+        if (name.endsWith(".zip")) return "application/zip";
+        return "application/octet-stream";
+    }
+
+    public static java.util.List<java.io.File> parseFilePaths(String value) {
+        java.util.List<java.io.File> files = new java.util.ArrayList<>();
+        if (value == null || value.isBlank()) return files;
+        String[] paths = value.split("[,;\\n\\r]+");
+        for (String p : paths) {
+            String trimmed = p.trim();
+            if (!trimmed.isEmpty()) {
+                files.add(new java.io.File(trimmed));
+            }
+        }
+        return files;
+    }
+
+    public static boolean isJson(String value) {
+        if (value == null) return false;
+        String trimmed = value.trim();
+        return (trimmed.startsWith("{") && trimmed.endsWith("}"))
+                || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+    }
 }

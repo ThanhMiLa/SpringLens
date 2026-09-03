@@ -112,7 +112,10 @@ public class CurlBuilderTest {
     }
 
     @Test
-    public void testCurlWithFormDataAndFiles() {
+    public void testCurlWithFormDataAndFiles() throws java.io.IOException {
+        java.io.File tempFile = java.io.File.createTempFile("avatar", ".png");
+        tempFile.deleteOnExit();
+
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/upload", "UploadController", "com.example", "upload");
         endpoint.setBodyType(RequestBodyType.FORM_DATA);
 
@@ -120,14 +123,53 @@ public class CurlBuilderTest {
         textField.setCurrentValue("JohnDoe");
 
         ParameterModel fileField = new ParameterModel("avatar", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
-        fileField.setCurrentValue("/path/to/avatar.png");
+        fileField.setCurrentValue(tempFile.getAbsolutePath());
 
         endpoint.addParameter(textField);
         endpoint.addParameter(fileField);
 
         String curl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/upload");
         Assert.assertTrue(curl.contains("-F \"username=JohnDoe\""));
-        Assert.assertTrue(curl.contains("-F \"avatar=@/path/to/avatar.png\""));
+        Assert.assertTrue(curl.contains("-F \"avatar=@" + tempFile.getAbsolutePath() + ";type=image/png\""));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCurlMissingFileFailsEarly() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/upload", "UploadController", "com.example", "upload");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+
+        ParameterModel fileField = new ParameterModel("avatar", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
+        fileField.setCurrentValue("/non/existent/file.png");
+        endpoint.addParameter(fileField);
+
+        CurlBuilder.buildCurl(endpoint, "http://localhost:8080/upload");
+    }
+
+    @Test
+    public void testCurlMixedMultipartFileTextAndJson() throws java.io.IOException {
+        java.io.File tempPdf = java.io.File.createTempFile("document", ".pdf");
+        tempPdf.deleteOnExit();
+
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/documents", "DocController", "com.example", "create");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+
+        ParameterModel textParam = new ParameterModel("title", ParamTypeEnum.FORM_DATA, "String");
+        textParam.setCurrentValue("Contract");
+
+        ParameterModel jsonParam = new ParameterModel("metadata", ParamTypeEnum.FORM_DATA, "String");
+        jsonParam.setCurrentValue("{\"author\":\"Alice\",\"version\":1}");
+
+        ParameterModel fileParam = new ParameterModel("file", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
+        fileParam.setCurrentValue(tempPdf.getAbsolutePath());
+
+        endpoint.addParameter(textParam);
+        endpoint.addParameter(jsonParam);
+        endpoint.addParameter(fileParam);
+
+        String curl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/documents");
+        Assert.assertTrue(curl.contains("-F \"title=Contract\""));
+        Assert.assertTrue(curl.contains("-F \"metadata={\\\"author\\\":\\\"Alice\\\",\\\"version\\\":1};type=application/json\""));
+        Assert.assertTrue(curl.contains("-F \"file=@" + tempPdf.getAbsolutePath() + ";type=application/pdf\""));
     }
 
     @Test

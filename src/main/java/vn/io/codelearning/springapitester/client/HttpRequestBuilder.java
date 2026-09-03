@@ -5,6 +5,7 @@ import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.MultipartBody;
+import okhttp3.Headers;
 import vn.io.codelearning.springapitester.model.*;
 
 import java.nio.charset.StandardCharsets;
@@ -149,27 +150,39 @@ public class HttpRequestBuilder {
                 
                 boolean hasData = false;
                 for (ParameterModel param : endpoint.getParameters()) {
+                    if (!param.isEnabled()) continue;
                     if (param.getParamType() == ParamTypeEnum.FORM_DATA || 
                         param.getParamType() == ParamTypeEnum.MULTIPART_FILE ||
                         param.getParamType() == ParamTypeEnum.MODEL_ATTRIBUTE) {
                         
                         String key = param.getName();
-                        String val = param.getCurrentValue() != null ? param.getCurrentValue() : "";
-                        if (key != null && !key.isEmpty()) {
-                            if (!val.trim().isEmpty()) {
-                                if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
-                                    java.io.File file = new java.io.File(val);
-                                    if (file.exists() && file.isFile()) {
-                                        // Upload file thật
-                                        RequestBody fileBody = RequestBody.create(file, MediaType.parse("application/octet-stream"));
-                                        multipartBuilder.addFormDataPart(key, file.getName(), fileBody);
-                                    } else {
-                                        // Giả lập file upload từ text
-                                        RequestBody fileBody = RequestBody.create(val, MediaType.parse("application/octet-stream"));
-                                        multipartBuilder.addFormDataPart(key, "dummy.txt", fileBody);
+                        String val = RequestValidationUtil.resolveParamValue(param);
+                        if (param.isRequired() && val.trim().isEmpty()) {
+                            throw new IllegalArgumentException("Missing required form parameter: " + key);
+                        }
+                        if (key != null && !key.isEmpty() && !val.trim().isEmpty()) {
+                            if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
+                                java.util.List<java.io.File> files = RequestValidationUtil.parseFilePaths(val);
+                                if (files.isEmpty() && param.isRequired()) {
+                                    throw new IllegalArgumentException("Missing required file for parameter: " + key);
+                                }
+                                for (java.io.File file : files) {
+                                    if (!file.exists() || !file.isFile()) {
+                                        throw new IllegalArgumentException("File not found or not a valid file: " + file.getPath() + " for parameter: " + key);
                                     }
+                                    String mime = RequestValidationUtil.detectMimeType(file);
+                                    RequestBody fileBody = RequestBody.create(file, MediaType.parse(mime));
+                                    multipartBuilder.addFormDataPart(key, file.getName(), fileBody);
+                                    hasData = true;
+                                }
+                            } else {
+                                if (RequestValidationUtil.isJson(val)) {
+                                    RequestBody partBody = RequestBody.create(val, MediaType.parse("application/json; charset=utf-8"));
+                                    Headers partHeaders = new Headers.Builder()
+                                            .addUnsafeNonAscii("Content-Disposition", "form-data; name=\"" + key + "\"")
+                                            .build();
+                                    multipartBuilder.addPart(partHeaders, partBody);
                                 } else {
-                                    // Gửi text bình thường
                                     multipartBuilder.addFormDataPart(key, val);
                                 }
                                 hasData = true;

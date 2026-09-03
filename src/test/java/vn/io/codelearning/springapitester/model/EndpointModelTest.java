@@ -23,6 +23,9 @@ public class EndpointModelTest {
         Assert.assertEquals(ParamTypeEnum.COOKIE, ParamTypeEnum.fromAnnotationOrType("CookieValue", "java.lang.String"));
         Assert.assertEquals(ParamTypeEnum.REQUEST_BODY, ParamTypeEnum.fromAnnotationOrType("RequestBody", "com.demo.UserDTO"));
         Assert.assertEquals(ParamTypeEnum.MULTIPART_FILE, ParamTypeEnum.fromAnnotationOrType("RequestPart", "org.springframework.web.multipart.MultipartFile"));
+        Assert.assertEquals(ParamTypeEnum.FORM_DATA, ParamTypeEnum.fromAnnotationOrType("RequestPart", "com.demo.UserDTO"));
+        Assert.assertEquals(ParamTypeEnum.MULTIPART_FILE, ParamTypeEnum.fromAnnotationOrType("RequestParam", "org.springframework.web.multipart.MultipartFile"));
+        Assert.assertEquals(ParamTypeEnum.MULTIPART_FILE, ParamTypeEnum.fromAnnotationOrType(null, "jakarta.servlet.http.Part"));
         Assert.assertEquals(ParamTypeEnum.FRAMEWORK_INTERNAL, ParamTypeEnum.fromAnnotationOrType(null, "jakarta.servlet.http.HttpServletRequest"));
         Assert.assertEquals(ParamTypeEnum.FRAMEWORK_INTERNAL, ParamTypeEnum.fromAnnotationOrType(null, "java.security.Principal"));
     }
