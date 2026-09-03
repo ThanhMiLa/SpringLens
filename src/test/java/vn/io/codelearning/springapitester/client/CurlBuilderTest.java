@@ -269,4 +269,75 @@ public class CurlBuilderTest {
         endpoint.addParameter(header);
         CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api");
     }
+
+    @Test
+    public void testWindowsCmdExportEscapingAndQuoting() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/v1/update", "UpdateCtrl", "com.example", "update");
+        endpoint.setBodyType(RequestBodyType.JSON);
+        endpoint.setRequestBodyJson("{\"percent\":\"100%\"}");
+        endpoint.addCustomHeader(new HeaderItem("X-Custom", "quoted \"val\"", true));
+
+        String cmd = CurlBuilder.buildWindowsCmd(endpoint, "http://localhost:8080/api/v1/update", true);
+        Assert.assertTrue(cmd.startsWith("curl -X POST"));
+        Assert.assertTrue(cmd.contains(" ^\n  -H \"X-Custom: quoted \\\"val\\\"\""));
+        Assert.assertTrue(cmd.contains(" ^\n  --data-raw \"{\\\"percent\\\":\\\"100%%\\\"}\""));
+    }
+
+    @Test
+    public void testPowerShellMultipartExport() throws IOException {
+        File tempFile = File.createTempFile("ps_upload", ".txt");
+        tempFile.deleteOnExit();
+        java.nio.file.Files.writeString(tempFile.toPath(), "file content");
+
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/v1/upload", "UploadCtrl", "com.example", "upload");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+        ParameterModel pFile = new ParameterModel("avatar", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
+        pFile.setCurrentValue(tempFile.getAbsolutePath());
+        ParameterModel pText = new ParameterModel("username", ParamTypeEnum.FORM_DATA, "String");
+        pText.setCurrentValue("john_doe");
+
+        endpoint.addParameter(pFile);
+        endpoint.addParameter(pText);
+
+        String ps = CurlBuilder.buildPowerShell(endpoint, "http://localhost:8080/api/v1/upload", false);
+        Assert.assertTrue(ps.contains("$form = @{"));
+        Assert.assertTrue(ps.contains("'avatar' = Get-Item '" + tempFile.getAbsolutePath() + "'"));
+        Assert.assertTrue(ps.contains("'username' = 'john_doe'"));
+        Assert.assertTrue(ps.contains("Invoke-RestMethod -Method POST -Uri 'http://localhost:8080/api/v1/upload' -Form $form"));
+    }
+
+    @Test
+    public void testCredentialRedactionAcrossAllExportFormats() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/v1/secure", "SecureCtrl", "com.example", "getSecure");
+        AuthConfig auth = new AuthConfig();
+        auth.setAuthType(AuthTypeEnum.BEARER_TOKEN);
+        auth.setBearerToken("super-secret-token");
+        endpoint.setAuthConfig(auth);
+
+        ParameterModel tokenParam = new ParameterModel("apikey", ParamTypeEnum.QUERY_PARAM, "String");
+        tokenParam.setCurrentValue("confidential-key");
+        endpoint.addParameter(tokenParam);
+
+        String bash = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api/v1/secure", false);
+        String cmd = CurlBuilder.buildWindowsCmd(endpoint, "http://localhost:8080/api/v1/secure", false);
+        String ps = CurlBuilder.buildPowerShell(endpoint, "http://localhost:8080/api/v1/secure", false);
+
+        // Bash
+        Assert.assertTrue(bash.contains("apikey=[REDACTED]") || bash.contains("apikey=%5BREDACTED%5D"));
+        Assert.assertTrue(bash.contains("Authorization: [REDACTED]"));
+        Assert.assertFalse(bash.contains("super-secret-token"));
+        Assert.assertFalse(bash.contains("confidential-key"));
+
+        // Windows CMD
+        Assert.assertTrue(cmd.contains("apikey=[REDACTED]") || cmd.contains("apikey=%5BREDACTED%5D") || cmd.contains("apikey=%%5BREDACTED%%5D"));
+        Assert.assertTrue(cmd.contains("Authorization: [REDACTED]"));
+        Assert.assertFalse(cmd.contains("super-secret-token"));
+        Assert.assertFalse(cmd.contains("confidential-key"));
+
+        // PowerShell
+        Assert.assertTrue(ps.contains("apikey=[REDACTED]") || ps.contains("apikey=%5BREDACTED%5D"));
+        Assert.assertTrue(ps.contains("Authorization' = '[REDACTED]'"));
+        Assert.assertFalse(ps.contains("super-secret-token"));
+        Assert.assertFalse(ps.contains("confidential-key"));
+    }
 }

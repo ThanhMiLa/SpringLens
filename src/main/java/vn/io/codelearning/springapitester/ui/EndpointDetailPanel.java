@@ -237,34 +237,65 @@ public class EndpointDetailPanel extends JPanel {
         JButton curlBtn = new JButton("cURL ▾");
         curlBtn.setToolTipText("Copy as cURL or PowerShell command");
         JPopupMenu curlMenu = new JPopupMenu();
-        JMenuItem copyRedacted = new JMenuItem("Copy cURL (Redacted credentials)");
-        copyRedacted.addActionListener(ev -> {
+        JMenuItem copyBashRedacted = new JMenuItem("Copy cURL (Bash/Zsh - Redacted)");
+        copyBashRedacted.addActionListener(ev -> {
             if (currentEndpoint == null) return;
             collectDataToModel();
             String curl = vn.io.codelearning.springapitester.client.CurlBuilder.buildCurl(currentEndpoint, urlField.getText(), false);
             com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(new java.awt.datatransfer.StringSelection(curl));
-            com.intellij.openapi.ui.Messages.showInfoMessage(project, "cURL command (redacted) copied to clipboard!", "Success");
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "cURL (Bash/Zsh, redacted) copied to clipboard!", "Success");
         });
-        JMenuItem copyWithCreds = new JMenuItem("Copy cURL (Include credentials)");
-        copyWithCreds.addActionListener(ev -> {
+        JMenuItem copyBashWithCreds = new JMenuItem("Copy cURL (Bash/Zsh - Include Credentials)");
+        copyBashWithCreds.addActionListener(ev -> {
             if (currentEndpoint == null) return;
             collectDataToModel();
             String curl = vn.io.codelearning.springapitester.client.CurlBuilder.buildCurl(currentEndpoint, urlField.getText(), true);
             com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(new java.awt.datatransfer.StringSelection(curl));
-            com.intellij.openapi.ui.Messages.showInfoMessage(project, "cURL command (with credentials) copied to clipboard!", "Success");
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "cURL (Bash/Zsh, with credentials) copied to clipboard!", "Success");
         });
-        JMenuItem copyPowerShell = new JMenuItem("Copy PowerShell");
-        copyPowerShell.addActionListener(ev -> {
+
+        JMenuItem copyCmdRedacted = new JMenuItem("Copy cURL (Windows CMD - Redacted)");
+        copyCmdRedacted.addActionListener(ev -> {
+            if (currentEndpoint == null) return;
+            collectDataToModel();
+            String cmd = vn.io.codelearning.springapitester.client.CurlBuilder.buildWindowsCmd(currentEndpoint, urlField.getText(), false);
+            com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(new java.awt.datatransfer.StringSelection(cmd));
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "cURL (Windows CMD, redacted) copied to clipboard!", "Success");
+        });
+        JMenuItem copyCmdWithCreds = new JMenuItem("Copy cURL (Windows CMD - Include Credentials)");
+        copyCmdWithCreds.addActionListener(ev -> {
+            if (currentEndpoint == null) return;
+            collectDataToModel();
+            String cmd = vn.io.codelearning.springapitester.client.CurlBuilder.buildWindowsCmd(currentEndpoint, urlField.getText(), true);
+            com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(new java.awt.datatransfer.StringSelection(cmd));
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "cURL (Windows CMD, with credentials) copied to clipboard!", "Success");
+        });
+
+        JMenuItem copyPowerShellRedacted = new JMenuItem("Copy PowerShell (Redacted)");
+        copyPowerShellRedacted.addActionListener(ev -> {
             if (currentEndpoint == null) return;
             collectDataToModel();
             String ps = vn.io.codelearning.springapitester.client.CurlBuilder.buildPowerShell(currentEndpoint, urlField.getText(), false);
             com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(new java.awt.datatransfer.StringSelection(ps));
-            com.intellij.openapi.ui.Messages.showInfoMessage(project, "PowerShell command copied to clipboard!", "Success");
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "PowerShell command (redacted) copied to clipboard!", "Success");
         });
-        curlMenu.add(copyRedacted);
-        curlMenu.add(copyWithCreds);
+        JMenuItem copyPowerShellWithCreds = new JMenuItem("Copy PowerShell (Include Credentials)");
+        copyPowerShellWithCreds.addActionListener(ev -> {
+            if (currentEndpoint == null) return;
+            collectDataToModel();
+            String ps = vn.io.codelearning.springapitester.client.CurlBuilder.buildPowerShell(currentEndpoint, urlField.getText(), true);
+            com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(new java.awt.datatransfer.StringSelection(ps));
+            com.intellij.openapi.ui.Messages.showInfoMessage(project, "PowerShell command (with credentials) copied to clipboard!", "Success");
+        });
+
+        curlMenu.add(copyBashRedacted);
+        curlMenu.add(copyBashWithCreds);
         curlMenu.addSeparator();
-        curlMenu.add(copyPowerShell);
+        curlMenu.add(copyCmdRedacted);
+        curlMenu.add(copyCmdWithCreds);
+        curlMenu.addSeparator();
+        curlMenu.add(copyPowerShellRedacted);
+        curlMenu.add(copyPowerShellWithCreds);
 
         curlBtn.addActionListener(e -> curlMenu.show(curlBtn, 0, curlBtn.getHeight()));
 

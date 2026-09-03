@@ -3,28 +3,23 @@ package vn.io.codelearning.springapitester.client;
 import okhttp3.HttpUrl;
 import okhttp3.Request;
 import vn.io.codelearning.springapitester.model.EndpointModel;
-import vn.io.codelearning.springapitester.model.ParameterModel;
-import vn.io.codelearning.springapitester.model.ParamTypeEnum;
-import vn.io.codelearning.springapitester.model.RequestBodyType;
+import vn.io.codelearning.springapitester.model.MultipartPartModel;
 import vn.io.codelearning.springapitester.state.CredentialStore;
 
-import java.io.File;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * Xây dựng câu lệnh cURL và PowerShell an toàn, chính xác từ EndpointModel hoặc okhttp3.Request.
+ * Xây dựng câu lệnh cURL, PowerShell, và Windows CMD an toàn, chính xác từ ResolvedRequest hoặc EndpointModel.
  */
 public class CurlBuilder {
 
     /**
      * Escape an argument according to POSIX shell single-quoting rules.
-     * Every character inside single quotes is treated literally by POSIX shell (bash, sh, zsh).
-     * Single quotes within the string are represented as '\''.
      */
     public static String escapeShellArg(String arg) {
-        if (arg == null) return "''";
-        if (arg.isEmpty()) return "''";
+        if (arg == null || arg.isEmpty()) return "''";
         return "'" + arg.replace("'", "'\\''") + "'";
     }
 
@@ -32,9 +27,17 @@ public class CurlBuilder {
      * Escape an argument for PowerShell single-quoting rules.
      */
     public static String escapePowerShellArg(String arg) {
-        if (arg == null) return "''";
-        if (arg.isEmpty()) return "''";
+        if (arg == null || arg.isEmpty()) return "''";
         return "'" + arg.replace("'", "''") + "'";
+    }
+
+    /**
+     * Escape an argument for Windows Command Prompt (cmd.exe) double-quoting rules.
+     */
+    public static String escapeCmdArg(String arg) {
+        if (arg == null || arg.isEmpty()) return "\"\"";
+        String escaped = arg.replace("\\", "\\\\").replace("\"", "\\\"").replace("%", "%%");
+        return "\"" + escaped + "\"";
     }
 
     public static boolean isSensitiveQueryParam(String key) {
@@ -50,8 +53,8 @@ public class CurlBuilder {
 
     public static String buildCurl(EndpointModel endpoint, String fullUrlPattern, boolean includeCredentials) {
         if (endpoint == null) return "curl";
-        Request request = HttpRequestBuilder.buildRequest(endpoint, fullUrlPattern);
-        return buildCurl(request, endpoint, includeCredentials);
+        ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(endpoint, fullUrlPattern);
+        return buildCurl(resolved, includeCredentials);
     }
 
     public static String buildCurl(Request request, boolean includeCredentials) {
@@ -60,75 +63,53 @@ public class CurlBuilder {
 
     public static String buildCurl(Request request, EndpointModel endpoint, boolean includeCredentials) {
         if (request == null) return "curl";
-
-        StringBuilder curl = new StringBuilder("curl");
-        curl.append(" -X ").append(request.method());
-
-        HttpUrl url = request.url();
-        String finalUrl = url.toString();
-        if (!includeCredentials) {
-            HttpUrl.Builder sanitized = url.newBuilder();
-            boolean modified = false;
-            for (int i = 0; i < url.querySize(); i++) {
-                String qName = url.queryParameterName(i);
-                if (isSensitiveQueryParam(qName)) {
-                    sanitized.setQueryParameter(qName, "[REDACTED]");
-                    modified = true;
-                }
-            }
-            if (modified) {
-                finalUrl = sanitized.build().toString();
-            }
+        if (endpoint != null) {
+            ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(endpoint, request.url().toString());
+            return buildCurl(resolved, includeCredentials);
         }
-        curl.append(" ").append(escapeShellArg(finalUrl));
-
-        okhttp3.Headers headers = request.headers();
-        boolean hasContentType = headers.get("Content-Type") != null;
-        if (!hasContentType && request.body() != null && request.body().contentType() != null) {
-            if (endpoint == null || endpoint.getBodyType() != RequestBodyType.FORM_DATA) {
-                curl.append(" \\\n  -H ").append(escapeShellArg("Content-Type: " + request.body().contentType()));
-            }
-        }
-        for (int i = 0; i < headers.size(); i++) {
-            String name = headers.name(i);
-            String val = headers.value(i);
-            if (!includeCredentials && CredentialStore.isSensitiveHeader(name)) {
-                val = "[REDACTED]";
-            }
+        StringBuilder curl = new StringBuilder("curl -X ").append(request.method());
+        curl.append(" ").append(escapeShellArg(sanitizeUrl(request.url(), includeCredentials)));
+        for (int i = 0; i < request.headers().size(); i++) {
+            String name = request.headers().name(i);
+            String val = (!includeCredentials && CredentialStore.isSensitiveHeader(name))
+                    ? "[REDACTED]" : request.headers().value(i);
             curl.append(" \\\n  -H ").append(escapeShellArg(name + ": " + val));
         }
+        return curl.toString();
+    }
 
-        if (endpoint != null && endpoint.getBodyType() == RequestBodyType.FORM_DATA) {
-            for (ParameterModel param : endpoint.getParameters()) {
-                if (!param.isEnabled()) continue;
-                if (param.getParamType() == ParamTypeEnum.FORM_DATA ||
-                        param.getParamType() == ParamTypeEnum.MULTIPART_FILE ||
-                        param.getParamType() == ParamTypeEnum.MODEL_ATTRIBUTE) {
-                    String key = param.getName();
-                    String val = RequestValidationUtil.resolveParamValue(param);
-                    if (key != null && !key.isEmpty() && !val.trim().isEmpty()) {
-                        if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
-                            List<File> files = RequestValidationUtil.parseFilePaths(val);
-                            for (File file : files) {
-                                String mime = RequestValidationUtil.detectMimeType(file);
-                                curl.append(" \\\n  -F ").append(escapeShellArg(key + "=@" + file.getAbsolutePath() + ";type=" + mime));
-                            }
-                        } else {
-                            if (RequestValidationUtil.isJson(val)) {
-                                curl.append(" \\\n  -F ").append(escapeShellArg(key + "=" + val + ";type=application/json"));
-                            } else {
-                                curl.append(" \\\n  -F ").append(escapeShellArg(key + "=" + val));
-                            }
-                        }
-                    }
+    public static String buildCurl(ResolvedRequest resolved, boolean includeCredentials) {
+        if (resolved == null) return "curl";
+        StringBuilder curl = new StringBuilder("curl -X ").append(resolved.getMethod().name());
+        curl.append(" ").append(escapeShellArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
+
+        for (Map.Entry<String, String> header : resolved.getHeaders().entrySet()) {
+            String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
+                    ? "[REDACTED]" : header.getValue();
+            curl.append(" \\\n  -H ").append(escapeShellArg(header.getKey() + ": " + val));
+        }
+
+        boolean hasContentType = resolved.getHeaders().containsKey("Content-Type");
+        if (!hasContentType && resolved.getBody() != null && resolved.getBody().contentType() != null && resolved.getMultipartParts().isEmpty()) {
+            curl.append(" \\\n  -H ").append(escapeShellArg("Content-Type: " + resolved.getBody().contentType()));
+        }
+
+        if (!resolved.getMultipartParts().isEmpty()) {
+            for (MultipartPartModel part : resolved.getMultipartParts()) {
+                if (part.isFile()) {
+                    String mime = part.getContentType() != null ? ";type=" + part.getContentType() : "";
+                    curl.append(" \\\n  -F ").append(escapeShellArg(part.getName() + "=@" + part.getFile().getAbsolutePath() + mime));
+                } else if (part.isJson()) {
+                    curl.append(" \\\n  -F ").append(escapeShellArg(part.getName() + "=" + part.getTextValue() + ";type=application/json"));
+                } else {
+                    curl.append(" \\\n  -F ").append(escapeShellArg(part.getName() + "=" + part.getTextValue()));
                 }
             }
-        } else if (request.body() != null) {
-            String json = endpoint != null ? endpoint.getRequestBodyJson() : "";
-            if (json == null || json.trim().isEmpty()) {
-                json = "{}";
+        } else if (resolved.getBody() != null) {
+            String bodyStr = new String(resolved.getRawBodyBytes(), StandardCharsets.UTF_8);
+            if (!bodyStr.isEmpty()) {
+                curl.append(" \\\n  --data-raw ").append(escapeShellArg(bodyStr));
             }
-            curl.append(" \\\n  --data-raw ").append(escapeShellArg(json));
         }
 
         return curl.toString();
@@ -136,49 +117,111 @@ public class CurlBuilder {
 
     public static String buildPowerShell(EndpointModel endpoint, String fullUrlPattern, boolean includeCredentials) {
         if (endpoint == null) return "";
-        Request request = HttpRequestBuilder.buildRequest(endpoint, fullUrlPattern);
-        StringBuilder ps = new StringBuilder("Invoke-RestMethod");
-        ps.append(" -Method ").append(request.method());
+        ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(endpoint, fullUrlPattern);
+        return buildPowerShell(resolved, includeCredentials);
+    }
 
-        HttpUrl url = request.url();
-        String finalUrl = url.toString();
-        if (!includeCredentials) {
-            HttpUrl.Builder sanitized = url.newBuilder();
-            boolean modified = false;
-            for (int i = 0; i < url.querySize(); i++) {
-                String qName = url.queryParameterName(i);
-                if (isSensitiveQueryParam(qName)) {
-                    sanitized.setQueryParameter(qName, "[REDACTED]");
-                    modified = true;
+    public static String buildPowerShell(ResolvedRequest resolved, boolean includeCredentials) {
+        if (resolved == null) return "";
+        StringBuilder ps = new StringBuilder();
+
+        if (!resolved.getMultipartParts().isEmpty()) {
+            ps.append("$form = @{\n");
+            for (MultipartPartModel part : resolved.getMultipartParts()) {
+                if (part.isFile()) {
+                    ps.append("  ").append(escapePowerShellArg(part.getName())).append(" = Get-Item ")
+                            .append(escapePowerShellArg(part.getFile().getAbsolutePath())).append("\n");
+                } else {
+                    ps.append("  ").append(escapePowerShellArg(part.getName())).append(" = ")
+                            .append(escapePowerShellArg(part.getTextValue())).append("\n");
                 }
             }
-            if (modified) {
-                finalUrl = sanitized.build().toString();
+            ps.append("}\n");
+            ps.append("Invoke-RestMethod -Method ").append(resolved.getMethod().name());
+            ps.append(" -Uri ").append(escapePowerShellArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
+            ps.append(" -Form $form");
+        } else {
+            ps.append("Invoke-RestMethod -Method ").append(resolved.getMethod().name());
+            ps.append(" -Uri ").append(escapePowerShellArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
+            if (resolved.getBody() != null) {
+                String bodyStr = new String(resolved.getRawBodyBytes(), StandardCharsets.UTF_8);
+                if (!bodyStr.isEmpty()) {
+                    ps.append(" -Body ").append(escapePowerShellArg(bodyStr));
+                }
             }
         }
-        ps.append(" -Uri ").append(escapePowerShellArg(finalUrl));
 
-        okhttp3.Headers headers = request.headers();
-        if (headers.size() > 0) {
+        if (!resolved.getHeaders().isEmpty()) {
             ps.append(" -Headers @{");
             boolean first = true;
-            for (int i = 0; i < headers.size(); i++) {
-                String name = headers.name(i);
-                String val = headers.value(i);
-                if (!includeCredentials && CredentialStore.isSensitiveHeader(name)) {
-                    val = "[REDACTED]";
-                }
+            for (Map.Entry<String, String> header : resolved.getHeaders().entrySet()) {
+                String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
+                        ? "[REDACTED]" : header.getValue();
                 if (!first) ps.append("; ");
-                ps.append(escapePowerShellArg(name)).append(" = ").append(escapePowerShellArg(val));
+                ps.append(escapePowerShellArg(header.getKey())).append(" = ").append(escapePowerShellArg(val));
                 first = false;
             }
             ps.append("}");
         }
 
-        if (endpoint.getBodyType() == RequestBodyType.JSON && endpoint.getRequestBodyJson() != null && !endpoint.getRequestBodyJson().isBlank()) {
-            ps.append(" -Body ").append(escapePowerShellArg(endpoint.getRequestBodyJson()));
+        return ps.toString();
+    }
+
+    public static String buildWindowsCmd(EndpointModel endpoint, String fullUrlPattern, boolean includeCredentials) {
+        if (endpoint == null) return "curl";
+        ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(endpoint, fullUrlPattern);
+        return buildWindowsCmd(resolved, includeCredentials);
+    }
+
+    public static String buildWindowsCmd(ResolvedRequest resolved, boolean includeCredentials) {
+        if (resolved == null) return "curl";
+        StringBuilder cmd = new StringBuilder("curl -X ").append(resolved.getMethod().name());
+        cmd.append(" ").append(escapeCmdArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
+
+        for (Map.Entry<String, String> header : resolved.getHeaders().entrySet()) {
+            String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
+                    ? "[REDACTED]" : header.getValue();
+            cmd.append(" ^\n  -H ").append(escapeCmdArg(header.getKey() + ": " + val));
         }
 
-        return ps.toString();
+        boolean hasContentType = resolved.getHeaders().containsKey("Content-Type");
+        if (!hasContentType && resolved.getBody() != null && resolved.getBody().contentType() != null && resolved.getMultipartParts().isEmpty()) {
+            cmd.append(" ^\n  -H ").append(escapeCmdArg("Content-Type: " + resolved.getBody().contentType()));
+        }
+
+        if (!resolved.getMultipartParts().isEmpty()) {
+            for (MultipartPartModel part : resolved.getMultipartParts()) {
+                if (part.isFile()) {
+                    String mime = part.getContentType() != null ? ";type=" + part.getContentType() : "";
+                    cmd.append(" ^\n  -F ").append(escapeCmdArg(part.getName() + "=@" + part.getFile().getAbsolutePath() + mime));
+                } else if (part.isJson()) {
+                    cmd.append(" ^\n  -F ").append(escapeCmdArg(part.getName() + "=" + part.getTextValue() + ";type=application/json"));
+                } else {
+                    cmd.append(" ^\n  -F ").append(escapeCmdArg(part.getName() + "=" + part.getTextValue()));
+                }
+            }
+        } else if (resolved.getBody() != null) {
+            String bodyStr = new String(resolved.getRawBodyBytes(), StandardCharsets.UTF_8);
+            if (!bodyStr.isEmpty()) {
+                cmd.append(" ^\n  --data-raw ").append(escapeCmdArg(bodyStr));
+            }
+        }
+
+        return cmd.toString();
+    }
+
+    private static String sanitizeUrl(HttpUrl url, boolean includeCredentials) {
+        if (url == null) return "";
+        if (includeCredentials) return url.toString();
+        HttpUrl.Builder sanitized = url.newBuilder();
+        boolean modified = false;
+        for (int i = 0; i < url.querySize(); i++) {
+            String qName = url.queryParameterName(i);
+            if (isSensitiveQueryParam(qName)) {
+                sanitized.setQueryParameter(qName, "[REDACTED]");
+                modified = true;
+            }
+        }
+        return modified ? sanitized.build().toString() : url.toString();
     }
 }

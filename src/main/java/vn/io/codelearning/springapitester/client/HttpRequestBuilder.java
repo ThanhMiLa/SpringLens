@@ -219,6 +219,9 @@ public class HttpRequestBuilder {
                 }
                 rawBytes = json.getBytes(StandardCharsets.UTF_8);
                 body = RequestBody.create(json, MediaType.parse("application/json; charset=utf-8"));
+                if (!resolvedHeaders.containsKey("Content-Type")) {
+                    resolvedHeaders.put("Content-Type", "application/json; charset=utf-8");
+                }
             }
             
         } else if (method == HttpMethodEnum.GET || method == HttpMethodEnum.HEAD) {
