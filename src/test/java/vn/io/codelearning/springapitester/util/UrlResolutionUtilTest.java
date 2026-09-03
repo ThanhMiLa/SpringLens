@@ -153,4 +153,28 @@ public class UrlResolutionUtilTest {
 
         Assert.assertEquals("/api/v1/search?q=spring&filter=active#page2", relative);
     }
+
+    @Test
+    public void testSanitizeCorruptedUrlDoesNotCorruptProxyQueryParameters() {
+        String urlWithTargetQuery = "/proxy?url=https://example.com/api";
+        Assert.assertEquals("/proxy?url=https://example.com/api",
+                UrlResolutionUtil.sanitizeCorruptedUrl(urlWithTargetQuery));
+
+        String urlWithMultipleHttpInQuery = "/forward?dest=http://remote.host:8080/v1&callback=https://callback.io";
+        Assert.assertEquals("/forward?dest=http://remote.host:8080/v1&callback=https://callback.io",
+                UrlResolutionUtil.sanitizeCorruptedUrl(urlWithMultipleHttpInQuery));
+    }
+
+    @Test
+    public void testResolveUrlPreservesContextPathWhenResolvingRelative() {
+        String baseWithContext = "http://localhost:8080/myapp";
+        String path = "/api/v1/users";
+        String resolved = ManualUrlResolver.resolveUrl(baseWithContext, path, false);
+        Assert.assertEquals("http://localhost:8080/myapp/api/v1/users", resolved);
+
+        // Base with query and trailing slash
+        String baseWithQuery = "http://localhost:8080/myapp/?oldParam=1";
+        String resolvedClean = ManualUrlResolver.resolveUrl(baseWithQuery, "/api/v1/users", false);
+        Assert.assertEquals("http://localhost:8080/myapp/api/v1/users", resolvedClean);
+    }
 }

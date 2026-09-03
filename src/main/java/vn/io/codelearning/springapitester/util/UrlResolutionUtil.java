@@ -18,19 +18,24 @@ public final class UrlResolutionUtil {
     public static String sanitizeCorruptedUrl(String rawPath) {
         if (rawPath == null || rawPath.isBlank()) return "";
         String p = rawPath.trim();
-        int httpIdx = p.indexOf("http://", 1);
-        if (httpIdx < 0) httpIdx = p.indexOf("https://", 1);
-        if (httpIdx < 0) httpIdx = p.indexOf("http:/", 1);
-        if (httpIdx < 0) httpIdx = p.indexOf("https:/", 1);
+        int queryIdx = p.indexOf('?');
+        String pathPart = queryIdx >= 0 ? p.substring(0, queryIdx) : p;
+        String queryPart = queryIdx >= 0 ? p.substring(queryIdx) : "";
+
+        int httpIdx = pathPart.indexOf("http://", 1);
+        if (httpIdx < 0) httpIdx = pathPart.indexOf("https://", 1);
+        if (httpIdx < 0) httpIdx = pathPart.indexOf("http:/", 1);
+        if (httpIdx < 0) httpIdx = pathPart.indexOf("https:/", 1);
+
         if (httpIdx > 0) {
-            String clean = p.substring(httpIdx);
+            String clean = pathPart.substring(httpIdx);
             if (clean.startsWith("http:/") && !clean.startsWith("http://")) {
                 clean = "http://" + clean.substring(6);
             }
             if (clean.startsWith("https:/") && !clean.startsWith("https://")) {
                 clean = "https://" + clean.substring(7);
             }
-            return clean;
+            return clean + queryPart;
         }
         return p;
     }

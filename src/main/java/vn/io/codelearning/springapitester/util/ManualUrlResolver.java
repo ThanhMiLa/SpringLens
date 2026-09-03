@@ -77,22 +77,25 @@ public final class ManualUrlResolver {
             throw new IllegalArgumentException("Invalid base URL: " + effectiveBase);
         }
 
-        // Normalize slashes
-        String cleanBase = effectiveBase;
-        while (cleanBase.endsWith("/")) {
-            cleanBase = cleanBase.substring(0, cleanBase.length() - 1);
+        // Clean base URL so query parameters or fragments on the base URL do not bleed into the endpoint URL
+        HttpUrl cleanBaseUrl = base.newBuilder().query(null).fragment(null).build();
+        String baseStr = cleanBaseUrl.toString();
+        while (baseStr.endsWith("/")) {
+            baseStr = baseStr.substring(0, baseStr.length() - 1);
         }
-        String cleanPath = trimmedPath.startsWith("/") ? trimmedPath : "/" + trimmedPath;
-
-        // Check if path has query parameters or fragments
-        String combined = cleanBase + cleanPath;
-        // Verify combined URL validity
-        String testCombined = combined.replace("{", "%7B").replace("}", "%7D");
-        if (HttpUrl.parse(testCombined) == null) {
-            throw new IllegalArgumentException("Cannot resolve URL: " + combined);
+        HttpUrl baseDirectory = HttpUrl.parse(baseStr + "/");
+        if (baseDirectory == null) {
+            throw new IllegalArgumentException("Cannot create base directory URL: " + baseStr);
         }
 
-        return combined;
+        String relativePath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+        String escapedRelative = relativePath.replace("{", "%7B").replace("}", "%7D");
+        HttpUrl resolved = baseDirectory.resolve(escapedRelative);
+        if (resolved == null) {
+            throw new IllegalArgumentException("Cannot resolve URL: " + trimmedPath + " against " + effectiveBase);
+        }
+
+        return resolved.toString().replace("%7B", "{").replace("%7D", "}");
     }
 
     /**
