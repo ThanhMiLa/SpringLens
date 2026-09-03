@@ -50,7 +50,9 @@ public final class EndpointIdentity {
             return new EndpointIdentity(id);
         }
 
-        String module = endpoint.getModuleName() != null ? endpoint.getModuleName() : "";
+        String module = endpoint.getModuleName() != null && !endpoint.getModuleName().isBlank()
+                ? endpoint.getModuleName().trim()
+                : "default";
         String ctrlFqn = resolveControllerFqn(endpoint);
         String sig = resolveMethodSignature(endpoint);
         HttpMethodEnum method = endpoint.getHttpMethod();
@@ -67,7 +69,8 @@ public final class EndpointIdentity {
         if (isManual) {
             return "manual:" + manualId;
         }
-        return module + ":" + controllerFqn + "#" + methodSignature + ":" + httpMethod.name() + ":" + normalizedPath;
+        String mod = (module == null || module.isBlank()) ? "default" : module;
+        return "scanned:" + mod + ":" + controllerFqn + "#" + methodSignature + ":" + httpMethod.name() + ":" + normalizedPath;
     }
 
     public static String normalizePath(String path) {

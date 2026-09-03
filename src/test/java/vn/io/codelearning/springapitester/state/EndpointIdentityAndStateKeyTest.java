@@ -154,7 +154,7 @@ public class EndpointIdentityAndStateKeyTest {
         EndpointModel ep = new EndpointModel(HttpMethodEnum.GET, "/api/unique", "UniqueController", "com.example", "getUnique");
         state.migrateLegacyKeys(List.of(ep));
 
-        Assert.assertEquals(2, state.schemaVersion);
+        Assert.assertEquals(3, state.schemaVersion);
         Assert.assertFalse(state.endpoints.containsKey("GET /api/unique"));
 
         String newKey = state.getEndpointKey(ep);
@@ -163,7 +163,7 @@ public class EndpointIdentityAndStateKeyTest {
     }
 
     @Test
-    public void testVersionedMigrationAmbiguousNeverAssigns() {
+    public void testVersionedMigrationAmbiguousQuarantinesSafely() {
         SpringLensState state = new SpringLensState();
         state.schemaVersion = 1;
 
@@ -177,11 +177,48 @@ public class EndpointIdentityAndStateKeyTest {
 
         state.migrateLegacyKeys(List.of(ep1, ep2));
 
-        Assert.assertEquals(2, state.schemaVersion);
-        // Ambiguous legacy key must be removed
+        Assert.assertEquals(3, state.schemaVersion);
+        // Ambiguous legacy key must be removed from active endpoints
         Assert.assertFalse(state.endpoints.containsKey("GET /api/common"));
-        // And never assigned to either endpoint
+        // Never blindly assigned to either endpoint
         Assert.assertFalse(state.endpoints.containsKey(state.getEndpointKey(ep1)));
+        Assert.assertFalse(state.endpoints.containsKey(state.getEndpointKey(ep2)));
+
+        // Safely quarantined with diagnostics
+        Assert.assertEquals(1, state.quarantinedEndpoints.size());
+        String qKey = state.quarantinedEndpoints.keySet().iterator().next();
+        Assert.assertTrue(qKey.startsWith("quarantine:ambiguous:GET /api/common:"));
+        Assert.assertEquals("ambiguous-value", state.quarantinedEndpoints.get(qKey).paramValues.get("QUERY_PARAM:filter"));
+
+        // User or system can restore quarantined endpoint to selected target
+        boolean restored = state.restoreQuarantinedEndpoint(qKey, ep1);
+        Assert.assertTrue(restored);
+        Assert.assertTrue(state.quarantinedEndpoints.isEmpty());
+        Assert.assertEquals("ambiguous-value", state.endpoints.get(state.getEndpointKey(ep1)).paramValues.get("QUERY_PARAM:filter"));
+    }
+
+    @Test
+    public void testOrphanScannedEndpointsPruning() {
+        SpringLensState state = new SpringLensState();
+
+        EndpointModel ep1 = new EndpointModel(HttpMethodEnum.GET, "/api/kept", "KeptCtrl", "com.example", "kept");
+        EndpointModel ep2 = new EndpointModel(HttpMethodEnum.GET, "/api/deleted", "DeletedCtrl", "com.example", "deleted");
+        EndpointModel manualEp = new EndpointModel(HttpMethodEnum.POST, "/api/manual", "", "", "");
+        manualEp.setManual(true);
+        manualEp.setId("manual-uuid-123");
+
+        state.saveEndpoint(ep1);
+        state.saveEndpoint(ep2);
+        state.saveEndpoint(manualEp);
+
+        Assert.assertEquals(3, state.endpoints.size());
+
+        // New scan: ep2 was deleted from source code!
+        state.pruneOrphanScannedEndpoints(List.of(ep1));
+
+        // ep1 kept, manual kept, ep2 pruned
+        Assert.assertTrue(state.endpoints.containsKey(state.getEndpointKey(ep1)));
+        Assert.assertTrue(state.endpoints.containsKey(state.getEndpointKey(manualEp)));
         Assert.assertFalse(state.endpoints.containsKey(state.getEndpointKey(ep2)));
     }
 

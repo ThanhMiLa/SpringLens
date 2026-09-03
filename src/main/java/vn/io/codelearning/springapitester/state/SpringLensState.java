@@ -10,8 +10,10 @@ import vn.io.codelearning.springapitester.model.AuthConfig;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @State(
@@ -20,8 +22,9 @@ import java.util.UUID;
 )
 public class SpringLensState implements PersistentStateComponent<SpringLensState> {
 
-    public int schemaVersion = 1;
+    public int schemaVersion = 3;
     public Map<String, EndpointSavedState> endpoints = new HashMap<>();
+    public Map<String, EndpointSavedState> quarantinedEndpoints = new HashMap<>();
     
     // Module 7: Manual structures
     public java.util.List<vn.io.codelearning.springapitester.model.FolderModel> manualFolders = new java.util.ArrayList<>();
@@ -48,6 +51,9 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     public void loadState(@NotNull SpringLensState state) {
         this.schemaVersion = state.schemaVersion;
         this.endpoints = state.endpoints != null ? state.endpoints : new HashMap<>();
+        if (state.quarantinedEndpoints != null) {
+            this.quarantinedEndpoints = state.quarantinedEndpoints;
+        }
         if (state.manualFolders != null) {
             this.manualFolders = state.manualFolders;
         }
@@ -226,7 +232,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
 
     public void migrateLegacyKeys(List<vn.io.codelearning.springapitester.model.EndpointModel> discoveredEndpoints) {
         if (discoveredEndpoints == null || discoveredEndpoints.isEmpty()) {
-            this.schemaVersion = 2;
+            this.schemaVersion = 3;
             return;
         }
 
@@ -239,32 +245,81 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
 
         List<String> currentKeys = new ArrayList<>(endpoints.keySet());
         for (String key : currentKeys) {
-            if (key.startsWith("manual:") || key.contains("#")) {
+            if (key.startsWith("scanned:") || key.startsWith("manual:")) {
                 continue;
             }
+            EndpointSavedState saved = endpoints.remove(key);
+            if (saved == null) continue;
+
+            if (key.contains("#")) {
+                // v2 key without "scanned:" prefix
+                String newKey = "scanned:" + key;
+                if (!endpoints.containsKey(newKey)) {
+                    endpoints.put(newKey, saved);
+                } else {
+                    quarantinedEndpoints.put("quarantine:collision:" + key + ":" + UUID.randomUUID(), saved);
+                }
+                continue;
+            }
+
+            // v1 key
             List<vn.io.codelearning.springapitester.model.EndpointModel> matches = grouped.get(key);
             if (matches != null && matches.size() == 1) {
                 vn.io.codelearning.springapitester.model.EndpointModel target = matches.get(0);
                 String newKey = getEndpointKey(target);
-                EndpointSavedState saved = endpoints.remove(key);
                 if (!endpoints.containsKey(newKey)) {
                     endpoints.put(newKey, saved);
+                } else {
+                    quarantinedEndpoints.put("quarantine:collision:" + key + ":" + UUID.randomUUID(), saved);
                 }
+            } else if (matches != null && matches.size() > 1) {
+                // Ambiguous collision: multiple endpoints match this legacy key! Quarantine rather than silently dropping.
+                quarantinedEndpoints.put("quarantine:ambiguous:" + key + ":" + UUID.randomUUID(), saved);
             } else {
-                endpoints.remove(key);
+                quarantinedEndpoints.put("quarantine:orphan:" + key + ":" + UUID.randomUUID(), saved);
             }
         }
-        this.schemaVersion = 2;
+        this.schemaVersion = 3;
+    }
+
+    public void pruneOrphanScannedEndpoints(List<vn.io.codelearning.springapitester.model.EndpointModel> currentScannedEndpoints) {
+        if (currentScannedEndpoints == null) return;
+        Set<String> activeKeys = new HashSet<>();
+        for (vn.io.codelearning.springapitester.model.EndpointModel ep : currentScannedEndpoints) {
+            if (!ep.isManual()) {
+                activeKeys.add(getEndpointKey(ep));
+            }
+        }
+        endpoints.keySet().removeIf(key -> key.startsWith("scanned:") && !activeKeys.contains(key));
+    }
+
+    public boolean restoreQuarantinedEndpoint(String quarantineKey, vn.io.codelearning.springapitester.model.EndpointModel target) {
+        if (quarantineKey == null || target == null) return false;
+        EndpointSavedState saved = quarantinedEndpoints.remove(quarantineKey);
+        if (saved == null) return false;
+        String newKey = getEndpointKey(target);
+        endpoints.put(newKey, saved);
+        restoreEndpoint(target);
+        return true;
     }
 
     public void restoreEndpoint(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
-        EndpointSavedState saved = endpoints.get(getEndpointKey(endpoint));
+        String modernKey = getEndpointKey(endpoint);
+        EndpointSavedState saved = endpoints.get(modernKey);
         if (saved == null && endpoint.isManual()) {
             saved = manualEndpoints.stream()
                     .filter(e -> e.id != null && e.id.equals(endpoint.getId()))
                     .findFirst().orElse(null);
         }
-        if (saved == null && schemaVersion < 2) {
+        if (saved == null && !endpoint.isManual()) {
+            // Check legacy key without "scanned:" prefix
+            String legacyV2Key = modernKey.startsWith("scanned:") ? modernKey.substring(8) : modernKey;
+            saved = endpoints.remove(legacyV2Key);
+            if (saved != null) {
+                endpoints.put(modernKey, saved);
+            }
+        }
+        if (saved == null && schemaVersion < 3) {
             String legacyKey = endpoint.getHttpMethod().name() + " " + endpoint.getPath();
             saved = endpoints.get(legacyKey);
         }
@@ -343,8 +398,10 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         if (store != null) {
             endpoints.values().forEach(saved -> store.delete(saved.credentialId));
             manualEndpoints.forEach(saved -> store.delete(saved.credentialId));
+            quarantinedEndpoints.values().forEach(saved -> store.delete(saved.credentialId));
         }
         this.endpoints.clear();
+        this.quarantinedEndpoints.clear();
         this.manualFolders.clear();
         this.manualEndpoints.clear();
     }
