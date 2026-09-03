@@ -9,7 +9,8 @@ import java.util.regex.Pattern;
  * Tiện ích chuẩn hóa và ghép nối đường dẫn URL của Spring Endpoints.
  */
 public final class SpringUrlUtils {
-    private static final Pattern PATH_VARIABLE_PATTERN = Pattern.compile("\\{([a-zA-Z0-9_]+)(?::[^}]+)?\\}");
+    private static final Pattern PATH_VARIABLE_PATTERN =
+            Pattern.compile("(?:\\{|%7B)([a-zA-Z0-9_]+)(?::[^}%]+)?(?:\\}|%7D)", Pattern.CASE_INSENSITIVE);
 
     private SpringUrlUtils() {}
 
@@ -71,7 +72,7 @@ public final class SpringUrlUtils {
     public static String replacePathVariable(String url, String paramName, String value) {
         if (url == null || paramName == null) return url;
         String val = value != null ? value : "";
-        String pattern = "\\{" + Pattern.quote(paramName) + "(?::[^}]+)?\\}";
+        String pattern = "(?i)(?:\\{|%7B)" + Pattern.quote(paramName) + "(?::[^}%]+)?(?:\\}|%7D)";
         return url.replaceAll(pattern, Matcher.quoteReplacement(val));
     }
 

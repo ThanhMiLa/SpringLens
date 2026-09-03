@@ -115,4 +115,42 @@ public class UrlResolutionUtilTest {
         String resolved = UrlResolutionUtil.resolveFullUrl(gatewayBase, manualAbsolute, true);
         Assert.assertEquals("https://thirdparty.service.com/webhook", resolved);
     }
+
+    @Test
+    public void testSchemeValidationRejectsNonHttpSchemes() {
+        Assert.assertThrows(IllegalArgumentException.class, () ->
+                ManualUrlResolver.validateScheme("file:///etc/passwd"));
+        Assert.assertThrows(IllegalArgumentException.class, () ->
+                ManualUrlResolver.validateScheme("javascript:alert(1)"));
+        Assert.assertThrows(IllegalArgumentException.class, () ->
+                ManualUrlResolver.validateScheme("ftp://ftp.example.com/data"));
+        Assert.assertThrows(IllegalArgumentException.class, () ->
+                ManualUrlResolver.validateScheme("data:text/html;base64,PHNjcmlwdD4="));
+
+        // Valid http / https must not throw
+        ManualUrlResolver.validateScheme("http://localhost:8080/api");
+        ManualUrlResolver.validateScheme("https://api.example.com");
+        // Path variable with regex colon must not throw
+        ManualUrlResolver.validateScheme("/users/{id:[0-9]+}");
+    }
+
+    @Test
+    public void testPathVariableReplacementInAbsoluteManualUrl() {
+        String manualUrl = "https://api.example.com/v1/{tenant}/users/{id:[0-9]+}";
+        String replaced = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(
+                manualUrl, "tenant", "acme-corp");
+        replaced = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(
+                replaced, "id", "12345");
+
+        Assert.assertEquals("https://api.example.com/v1/acme-corp/users/12345", replaced);
+        Assert.assertFalse(vn.io.codelearning.springapitester.scanner.SpringUrlUtils.hasUnresolvedPathVariables(replaced));
+    }
+
+    @Test
+    public void testExtractRelativePathAndQuery() {
+        String fullUrl = "http://localhost:8080/api/v1/search?q=spring&filter=active#page2";
+        String relative = ManualUrlResolver.extractRelativePathAndQuery(fullUrl, "http://localhost:8080");
+
+        Assert.assertEquals("/api/v1/search?q=spring&filter=active#page2", relative);
+    }
 }

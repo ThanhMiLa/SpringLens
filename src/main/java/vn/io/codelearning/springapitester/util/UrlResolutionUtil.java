@@ -8,30 +8,11 @@ public final class UrlResolutionUtil {
     }
 
     public static boolean isAbsoluteUrl(String url) {
-        if (url == null || url.isBlank()) return false;
-        String trimmed = url.trim();
-        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-            return false;
-        }
-        HttpUrl parsed = HttpUrl.parse(trimmed);
-        return parsed != null && parsed.scheme() != null && parsed.host() != null;
+        return ManualUrlResolver.isAbsoluteUrl(url);
     }
 
     public static String resolveFullUrl(String baseUrl, String path, boolean isAbsolute) {
-        if (path == null) path = "";
-        String trimmedPath = path.trim();
-        if (isAbsolute || isAbsoluteUrl(trimmedPath)) {
-            return trimmedPath;
-        }
-        if (baseUrl == null || baseUrl.isBlank()) {
-            return trimmedPath.startsWith("/") ? trimmedPath : "/" + trimmedPath;
-        }
-        String cleanBase = baseUrl.trim();
-        while (cleanBase.endsWith("/")) {
-            cleanBase = cleanBase.substring(0, cleanBase.length() - 1);
-        }
-        String cleanPath = trimmedPath.startsWith("/") ? trimmedPath : "/" + trimmedPath;
-        return cleanBase + cleanPath;
+        return ManualUrlResolver.resolveUrl(baseUrl, path, isAbsolute);
     }
 
     public static String sanitizeCorruptedUrl(String rawPath) {

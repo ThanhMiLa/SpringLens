@@ -161,17 +161,15 @@ public class EndpointDetailPanel extends JPanel {
             private void update() {
                 if (!isUpdatingUI && currentEndpoint != null) {
                     String url = urlField.getText().trim();
-                    if (vn.io.codelearning.springapitester.util.UrlResolutionUtil.isAbsoluteUrl(url)) {
+                    if (vn.io.codelearning.springapitester.util.ManualUrlResolver.isAbsoluteUrl(url)) {
                         currentEndpoint.setAbsoluteUrl(true);
                         currentEndpoint.setPath(url);
                     } else {
                         currentEndpoint.setAbsoluteUrl(false);
                         String effectiveBaseUrl = getEffectiveBaseUrl(currentEndpoint);
-                        if (!effectiveBaseUrl.isEmpty() && url.startsWith(effectiveBaseUrl)) {
-                            currentEndpoint.setPath(url.substring(effectiveBaseUrl.length()));
-                        } else {
-                            currentEndpoint.setPath(url);
-                        }
+                        String relativePath = vn.io.codelearning.springapitester.util.ManualUrlResolver
+                                .extractRelativePathAndQuery(url, effectiveBaseUrl);
+                        currentEndpoint.setPath(relativePath);
                     }
                     if (currentEndpoint.getInsecureTlsConsent() != null) {
                         okhttp3.HttpUrl parsed = okhttp3.HttpUrl.parse(url);
@@ -1082,11 +1080,8 @@ public class EndpointDetailPanel extends JPanel {
 
     private String getEffectiveBaseUrl(EndpointModel endpoint) {
         if (endpoint == null) return baseUrl != null ? baseUrl : "http://localhost:8080";
-        if (endpoint.isManual()) {
-            if (endpoint.isAbsoluteUrl()) {
-                return "";
-            }
-            return baseUrl != null ? baseUrl : "http://localhost:8080";
+        if (endpoint.isAbsoluteUrl()) {
+            return "";
         }
         
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
