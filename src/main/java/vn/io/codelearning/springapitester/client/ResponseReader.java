@@ -162,15 +162,6 @@ public final class ResponseReader {
         } else {
             if (!source.exhausted()) {
                 isTruncated = true;
-                long maxDrain = 10L * 1024 * 1024;
-                long drained = 0;
-                while (drained < maxDrain && !source.exhausted()) {
-                    long read = source.read(buffer, 8192);
-                    if (read == -1) break;
-                    drained += read;
-                    buffer.clear();
-                }
-                totalBytes += drained;
             }
         }
 
@@ -187,7 +178,8 @@ public final class ResponseReader {
             String mime = (contentType != null && !contentType.isBlank()) ? contentType : "application/octet-stream";
             String note = "[Binary data: " + mime + ", " + formatByteSize(totalBytes) + "]";
             if (isTruncated) {
-                note += "\n\n... [truncated: showing " + previewBytes.length + " of " + totalBytes + " bytes] --- [Binary preview truncated at " + formatByteSize(maxBytes) + ". Total size: " + formatByteSize(totalBytes) + "] ---";
+                String sizeInfo = (contentLength >= 0) ? formatByteSize(totalBytes) : "unknown";
+                note += "\n\n... [truncated: showing " + previewBytes.length + " bytes] --- [Binary preview truncated at " + formatByteSize(maxBytes) + ". Total size: " + sizeInfo + "] ---";
             }
             return new ReadResult(note, true, isTruncated, totalBytes, previewBytes);
         }
@@ -198,7 +190,8 @@ public final class ResponseReader {
 
         String text = new String(previewBytes, 0, safeBoundary, StandardCharsets.UTF_8);
         if (isTruncated) {
-            text += "\n\n... [truncated: showing " + safeBoundary + " of " + totalBytes + " bytes] --- [Response truncated at " + formatByteSize(maxBytes) + ". Total size: " + formatByteSize(totalBytes) + "] ---";
+            String sizeInfo = (contentLength >= 0) ? formatByteSize(totalBytes) : "unknown";
+            text += "\n\n... [truncated: showing " + safeBoundary + " bytes] --- [Response truncated at " + formatByteSize(maxBytes) + ". Total size: " + sizeInfo + "] ---";
         }
 
         return new ReadResult(text, false, isTruncated, totalBytes, previewBytes);
