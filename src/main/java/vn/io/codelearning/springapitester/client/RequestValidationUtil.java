@@ -127,11 +127,47 @@ public final class RequestValidationUtil {
     public static java.util.List<java.io.File> parseFilePaths(String value) {
         java.util.List<java.io.File> files = new java.util.ArrayList<>();
         if (value == null || value.isBlank()) return files;
-        String[] paths = value.split("[,;\\n\\r]+");
+        String trimmed = value.trim();
+
+        // 1. If entire string matches an existing filesystem path (e.g. filename contains commas/spaces)
+        java.io.File wholeFile = new java.io.File(trimmed);
+        if (wholeFile.exists()) {
+            files.add(wholeFile);
+            return files;
+        }
+
+        // 2. If structured JSON array of strings
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            try {
+                String[] parsed = new com.google.gson.Gson().fromJson(trimmed, String[].class);
+                if (parsed != null) {
+                    for (String path : parsed) {
+                        if (path != null && !path.trim().isEmpty()) {
+                            files.add(new java.io.File(path.trim()));
+                        }
+                    }
+                    return files;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // 3. If contains newline delimiter (clean multi-line format)
+        if (trimmed.contains("\n") || trimmed.contains("\r")) {
+            for (String line : trimmed.split("[\\r\\n]+")) {
+                String lineTrimmed = line.trim();
+                if (!lineTrimmed.isEmpty()) {
+                    files.add(new java.io.File(lineTrimmed));
+                }
+            }
+            return files;
+        }
+
+        // 4. Fallback comma or semicolon delimiter
+        String[] paths = trimmed.split("[,;]+");
         for (String p : paths) {
-            String trimmed = p.trim();
-            if (!trimmed.isEmpty()) {
-                files.add(new java.io.File(trimmed));
+            String pTrimmed = p.trim();
+            if (!pTrimmed.isEmpty()) {
+                files.add(new java.io.File(pTrimmed));
             }
         }
         return files;

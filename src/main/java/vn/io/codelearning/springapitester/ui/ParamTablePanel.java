@@ -55,8 +55,11 @@ public class ParamTablePanel extends JPanel {
                 textField = new JTextField();
                 filePicker = new com.intellij.openapi.ui.TextFieldWithBrowseButton();
                 filePicker.addBrowseFolderListener(
-                    "Select File", "Choose a file to upload", null,
-                    com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
+                    new com.intellij.openapi.ui.TextBrowseFolderListener(
+                        com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
+                            .withTitle("Select File")
+                            .withDescription("Choose a file to upload")
+                    )
                 );
             }
 

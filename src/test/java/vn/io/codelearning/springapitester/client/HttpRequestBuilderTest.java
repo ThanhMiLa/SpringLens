@@ -375,4 +375,50 @@ public class HttpRequestBuilderTest {
         Assert.assertThrows(IllegalArgumentException.class, () ->
                 HttpRequestBuilder.buildRequest(ep3, "http://localhost:8080/api/test"));
     }
+
+    @Test
+    public void testMultipartFilenameWithSpacesCommasAndUnicode() throws IOException {
+        java.io.File tempFile = java.io.File.createTempFile("report, 2026_báo_cáo ", ".pdf");
+        tempFile.deleteOnExit();
+        java.nio.file.Files.writeString(tempFile.toPath(), "pdf binary data");
+
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/docs", "DocCtrl", "com.example", "uploadDoc");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+
+        ParameterModel fileParam = new ParameterModel("document", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
+        fileParam.setCurrentValue(tempFile.getAbsolutePath());
+        endpoint.addParameter(fileParam);
+
+        ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(endpoint, "http://localhost:8080/api/docs");
+        Assert.assertEquals(1, resolved.getMultipartParts().size());
+        MultipartPartModel part = resolved.getMultipartParts().get(0);
+        Assert.assertEquals("document", part.getName());
+        Assert.assertEquals(tempFile.getAbsolutePath(), part.getFile().getAbsolutePath());
+        Assert.assertEquals("application/pdf", part.getContentType());
+        Assert.assertFalse(part.isLargeFile());
+
+        Request request = resolved.toOkHttpRequest();
+        okio.Buffer buffer = new okio.Buffer();
+        request.body().writeTo(buffer);
+        String bodyString = buffer.readUtf8();
+        Assert.assertTrue(bodyString.contains("document"));
+        Assert.assertTrue(bodyString.contains("pdf binary data"));
+    }
+
+    @Test
+    public void testMultipartDirectoryPathThrowsClearError() throws IOException {
+        java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("springlens_dir");
+        tempDir.toFile().deleteOnExit();
+
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/upload", "DocCtrl", "com.example", "upload");
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+
+        ParameterModel fileParam = new ParameterModel("file", ParamTypeEnum.MULTIPART_FILE, "MultipartFile");
+        fileParam.setCurrentValue(tempDir.toAbsolutePath().toString());
+        endpoint.addParameter(fileParam);
+
+        IllegalArgumentException ex = Assert.assertThrows(IllegalArgumentException.class, () ->
+                HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api/upload"));
+        Assert.assertTrue(ex.getMessage().contains("Path is a directory, not a file"));
+    }
 }
