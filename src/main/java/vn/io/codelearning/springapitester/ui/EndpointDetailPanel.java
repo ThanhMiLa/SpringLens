@@ -962,27 +962,65 @@ public class EndpointDetailPanel extends JPanel {
 
     private byte[] lastResponseRawBytes;
 
+    public static String stripTruncationBanner(String text) {
+        if (text == null) return "";
+        int idx = text.indexOf("\n\n... [truncated:");
+        if (idx >= 0) return text.substring(0, idx);
+        idx = text.indexOf("\n\n... [Binary preview truncated");
+        if (idx >= 0) return text.substring(0, idx);
+        return text;
+    }
+
     private void onSaveResponseToFile() {
         if (responseBodyEditor == null) return;
         javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
         fileChooser.setDialogTitle("Save Response to File");
         int userSelection = fileChooser.showSaveDialog(this);
-        if (userSelection == javax.swing.JFileChooser.APPROVE_OPTION) {
-            java.io.File fileToSave = fileChooser.getSelectedFile();
-            try {
-                byte[] rawBytes = currentEndpoint != null && currentEndpoint.getLastResponseRawBytes().length > 0
-                        ? currentEndpoint.getLastResponseRawBytes()
-                        : lastResponseRawBytes;
-                if (rawBytes != null && rawBytes.length > 0) {
-                    java.nio.file.Files.write(fileToSave.toPath(), rawBytes);
-                } else {
-                    String text = responseBodyEditor.getDocument().getText();
-                    java.nio.file.Files.writeString(fileToSave.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
-                }
+        if (userSelection != javax.swing.JFileChooser.APPROVE_OPTION) return;
+
+        java.io.File fileToSave = fileChooser.getSelectedFile();
+        byte[] rawBytes = currentEndpoint != null && currentEndpoint.getLastResponseRawBytes().length > 0
+                ? currentEndpoint.getLastResponseRawBytes()
+                : lastResponseRawBytes;
+        boolean isTruncated = currentEndpoint != null && currentEndpoint.isLastResponseTruncated();
+
+        try {
+            if (rawBytes != null && rawBytes.length > 0 && !isTruncated) {
+                java.nio.file.Files.write(fileToSave.toPath(), rawBytes);
                 com.intellij.openapi.ui.Messages.showInfoMessage(project, "Response saved to " + fileToSave.getAbsolutePath(), "Saved");
-            } catch (Exception ex) {
-                com.intellij.openapi.ui.Messages.showErrorDialog(project, "Failed to save file: " + ex.getMessage(), "Error");
+            } else if (isTruncated) {
+                int choice = com.intellij.openapi.ui.Messages.showYesNoDialog(
+                        project,
+                        "The response was truncated at preview. Only the first " +
+                                vn.io.codelearning.springapitester.client.ResponseReader.formatByteSize(rawBytes != null ? rawBytes.length : 0) +
+                                " will be saved.\n\nDo you want to proceed saving the partial data?",
+                        "Truncated Response",
+                        com.intellij.openapi.ui.Messages.getWarningIcon());
+                if (choice == com.intellij.openapi.ui.Messages.YES) {
+                    if (rawBytes != null && rawBytes.length > 0) {
+                        java.nio.file.Files.write(fileToSave.toPath(), rawBytes);
+                    } else {
+                        String text = responseBodyEditor.getDocument().getText();
+                        text = stripTruncationBanner(text);
+                        java.nio.file.Files.writeString(fileToSave.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
+                    }
+                    com.intellij.openapi.ui.Messages.showInfoMessage(project, "Partial response saved to " + fileToSave.getAbsolutePath(), "Saved");
+                }
+            } else {
+                String text = responseBodyEditor.getDocument().getText();
+                if (text.startsWith("[Binary data:")) {
+                    com.intellij.openapi.ui.Messages.showWarningDialog(
+                            project,
+                            "Cannot save binary response — raw data is no longer in memory. Please re-send the request first.",
+                            "No Data Available");
+                    return;
+                }
+                text = stripTruncationBanner(text);
+                java.nio.file.Files.writeString(fileToSave.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
+                com.intellij.openapi.ui.Messages.showInfoMessage(project, "Response saved to " + fileToSave.getAbsolutePath(), "Saved");
             }
+        } catch (Exception ex) {
+            com.intellij.openapi.ui.Messages.showErrorDialog(project, "Failed to save file: " + ex.getMessage(), "Error");
         }
     }
 
@@ -997,6 +1035,7 @@ public class EndpointDetailPanel extends JPanel {
         String format = detectResponseFormat(response);
         this.lastResponseRawBytes = response.getRawBytes();
         endpoint.setLastResponseRawBytes(response.getRawBytes());
+        endpoint.setLastResponseTruncated(response.isTruncated());
 
         endpoint.setLastResponseStatusCode(code);
         endpoint.setLastResponseStatusMessage(message);

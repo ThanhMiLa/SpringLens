@@ -246,4 +246,28 @@ public class ResponseReaderTest {
         retrieved[0] = (byte) 0xAA;
         Assert.assertEquals((byte) 0x00, ep.getLastResponseRawBytes()[0]);
     }
+
+    @Test
+    public void testStripTruncationBannerRemovesBanners() {
+        String text = "{\"status\":\"success\"}\n\n... [truncated: showing 100 of 5000 bytes] --- [Response truncated at 100 B. Total size: 5.0 KB] ---";
+        String cleaned = vn.io.codelearning.springapitester.ui.EndpointDetailPanel.stripTruncationBanner(text);
+        Assert.assertEquals("{\"status\":\"success\"}", cleaned);
+
+        String binaryText = "[Binary data: application/pdf, 10.0 MB]\n\n... [Binary preview truncated at 2.0 MB. Total size: 10.0 MB] ---";
+        String cleanedBinary = vn.io.codelearning.springapitester.ui.EndpointDetailPanel.stripTruncationBanner(binaryText);
+        Assert.assertEquals("[Binary data: application/pdf, 10.0 MB]", cleanedBinary);
+
+        String normalText = "{\"hello\":\"world\"}";
+        Assert.assertEquals(normalText, vn.io.codelearning.springapitester.ui.EndpointDetailPanel.stripTruncationBanner(normalText));
+        Assert.assertEquals("", vn.io.codelearning.springapitester.ui.EndpointDetailPanel.stripTruncationBanner(""));
+        Assert.assertEquals("", vn.io.codelearning.springapitester.ui.EndpointDetailPanel.stripTruncationBanner(null));
+    }
+
+    @Test
+    public void testEndpointModelLastResponseTruncatedFlag() {
+        EndpointModel ep = new EndpointModel(HttpMethodEnum.GET, "/api/test", "C", "P", "m");
+        Assert.assertFalse(ep.isLastResponseTruncated());
+        ep.setLastResponseTruncated(true);
+        Assert.assertTrue(ep.isLastResponseTruncated());
+    }
 }

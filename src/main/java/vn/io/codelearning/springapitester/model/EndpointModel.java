@@ -407,4 +407,14 @@ public class EndpointModel {
     public void setLastResponseRawBytes(byte[] lastResponseRawBytes) {
         this.lastResponseRawBytes = (lastResponseRawBytes != null) ? lastResponseRawBytes.clone() : new byte[0];
     }
+
+    private boolean lastResponseTruncated = false;
+
+    public boolean isLastResponseTruncated() {
+        return lastResponseTruncated;
+    }
+
+    public void setLastResponseTruncated(boolean lastResponseTruncated) {
+        this.lastResponseTruncated = lastResponseTruncated;
+    }
 }
