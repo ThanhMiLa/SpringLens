@@ -201,15 +201,7 @@ public class SpringConfigResolutionServiceTest {
         Assert.assertNull(SpringConfigResolutionService.findContextPathInProps(null));
     }
 
-    @Test
-    public void testHasContextPathHelper() {
-        Assert.assertTrue(SpringEndpointScanner.hasContextPath("http://localhost:8080/api"));
-        Assert.assertTrue(SpringEndpointScanner.hasContextPath("https://localhost:8443/api/v1"));
-        Assert.assertFalse(SpringEndpointScanner.hasContextPath("http://localhost:8080"));
-        Assert.assertFalse(SpringEndpointScanner.hasContextPath("http://localhost:8080/"));
-        Assert.assertFalse(SpringEndpointScanner.hasContextPath(null));
-        Assert.assertFalse(SpringEndpointScanner.hasContextPath(""));
-    }
+
 
     // Lightweight MockVirtualFile for testing path exclusion
     private static class MockVirtualFile extends com.intellij.mock.MockVirtualFile {

@@ -103,11 +103,6 @@ public class EndpointDetailPanel extends JPanel {
                 String extractedBase = configService != null
                         ? configService.resolveServerConfig().getBaseUrl()
                         : vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
-                String legacyBase = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
-                if (vn.io.codelearning.springapitester.scanner.SpringEndpointScanner.hasContextPath(legacyBase)
-                        && !vn.io.codelearning.springapitester.scanner.SpringEndpointScanner.hasContextPath(extractedBase)) {
-                    extractedBase = legacyBase;
-                }
                 final String finalBase = extractedBase;
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (project.isDisposed()) return;

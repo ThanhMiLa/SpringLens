@@ -45,14 +45,9 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                         List<EndpointModel> scannedEndpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
                         vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig gatewayConfig = 
                                 vn.io.codelearning.springapitester.util.GatewayConfigReader.findGatewayConfig(project);
-                        String initialBaseUrl = configService != null
+                        final String defaultBaseUrl = configService != null
                                 ? configService.resolveServerConfig().getBaseUrl()
                                 : vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
-                        String legacyDefaultBaseUrl = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
-                        if (SpringEndpointScanner.hasContextPath(legacyDefaultBaseUrl) && !SpringEndpointScanner.hasContextPath(initialBaseUrl)) {
-                            initialBaseUrl = legacyDefaultBaseUrl;
-                        }
-                        final String defaultBaseUrl = initialBaseUrl;
 
                         // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
                         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);

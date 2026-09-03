@@ -82,34 +82,12 @@ public class SpringEndpointScanner {
                         moduleName = serverConfig.getAppName();
                     }
                 }
-                vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig legacyConfig =
-                        vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project, module);
-                if (legacyConfig != null && legacyConfig.baseUrl != null && !legacyConfig.baseUrl.isBlank()) {
-                    if (isBaseWithoutContext(directBaseUrl) && hasContextPath(legacyConfig.baseUrl)) {
-                        directBaseUrl = legacyConfig.baseUrl;
-                    }
-                    if ((moduleName == null || moduleName.equals("Unknown") || moduleName.isBlank())
-                            && legacyConfig.appName != null && !legacyConfig.appName.isBlank()) {
-                        moduleName = legacyConfig.appName;
-                    }
-                }
             } else {
                 if (configService != null) {
                     SpringServerConfig serverConfig = configService.resolveServerConfig();
                     directBaseUrl = serverConfig.getBaseUrl();
                     if (serverConfig.getAppName() != null && !serverConfig.getAppName().isEmpty()) {
                         moduleName = serverConfig.getAppName();
-                    }
-                }
-                vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig legacyConfig =
-                        vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project);
-                if (legacyConfig != null && legacyConfig.baseUrl != null && !legacyConfig.baseUrl.isBlank()) {
-                    if (isBaseWithoutContext(directBaseUrl) && hasContextPath(legacyConfig.baseUrl)) {
-                        directBaseUrl = legacyConfig.baseUrl;
-                    }
-                    if ((moduleName == null || moduleName.equals("Unknown") || moduleName.isBlank())
-                            && legacyConfig.appName != null && !legacyConfig.appName.isBlank()) {
-                        moduleName = legacyConfig.appName;
                     }
                 }
             }
@@ -400,17 +378,5 @@ public class SpringEndpointScanner {
         return "default";
     }
 
-    public static boolean hasContextPath(String url) {
-        if (url == null || url.isBlank()) return false;
-        int portIdx = url.indexOf(":", 7);
-        if (portIdx != -1) {
-            int slashIdx = url.indexOf("/", portIdx);
-            return slashIdx != -1 && slashIdx < url.length() - 1;
-        }
-        return false;
-    }
 
-    public static boolean isBaseWithoutContext(String url) {
-        return !hasContextPath(url);
-    }
 }
