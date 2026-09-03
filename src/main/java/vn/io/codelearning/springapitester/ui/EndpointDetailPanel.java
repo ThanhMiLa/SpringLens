@@ -66,6 +66,8 @@ public class EndpointDetailPanel extends JPanel {
     private volatile boolean disposed = false;
     private final vn.io.codelearning.springapitester.client.RequestExecutionTracker requestTracker =
             new vn.io.codelearning.springapitester.client.RequestExecutionTracker();
+    private final java.util.concurrent.atomic.AtomicLong uiGenerationCounter =
+            new java.util.concurrent.atomic.AtomicLong();
     private final Set<HttpClientService.RequestHandle> activeRequests = ConcurrentHashMap.newKeySet();
 
     public void setOnEndpointUpdated(Runnable onEndpointUpdated) {
@@ -111,6 +113,7 @@ public class EndpointDetailPanel extends JPanel {
         this.project = project;
         Disposer.register(project, () -> {
             disposed = true;
+            requestTracker.dispose();
             activeRequests.forEach(HttpClientService.RequestHandle::cancel);
             activeRequests.clear();
             CodeEditorUtil.releaseEditor(requestBodyEditor);
@@ -579,6 +582,7 @@ public class EndpointDetailPanel extends JPanel {
     public void displayEndpoint(EndpointModel endpoint) {
         // Collect old data before switching
         collectDataToModel();
+        uiGenerationCounter.incrementAndGet();
 
         this.currentEndpoint = endpoint;
         if (endpoint == null) {
@@ -600,6 +604,8 @@ public class EndpointDetailPanel extends JPanel {
                 });
                 responseHeadersArea.setText("");
                 statusLabel.setText("Ready");
+                sendBtn.setText("Send");
+                sendBtn.setEnabled(false);
             } finally {
                 isUpdatingUI = false;
             }
@@ -608,7 +614,16 @@ public class EndpointDetailPanel extends JPanel {
 
         isUpdatingUI = true;
         try {
-            sendBtn.setEnabled(true);
+            vn.io.codelearning.springapitester.client.RequestExecutionContext active =
+                    requestTracker.getActiveContext(endpoint);
+            if (active != null && !active.isTerminal()) {
+                sendBtn.setText("Cancel");
+                sendBtn.setEnabled(true);
+                statusLabel.setText("Sending...");
+            } else {
+                sendBtn.setText("Send");
+                sendBtn.setEnabled(true);
+            }
             vn.io.codelearning.springapitester.model.HttpMethodEnum method = endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET;
             methodComboBox.setSelectedItem(method);
             updateMethodComboColor(method);
@@ -789,6 +804,19 @@ public class EndpointDetailPanel extends JPanel {
 
     private void onSendClicked() {
         if (currentEndpoint == null || disposed) return;
+
+        // If current endpoint has an in-flight request, clicking acts as Cancel
+        vn.io.codelearning.springapitester.client.RequestExecutionContext runningContext =
+                requestTracker.getActiveContext(currentEndpoint);
+        if (runningContext != null && !runningContext.isTerminal()) {
+            runningContext.cancel();
+            requestTracker.cancel(currentEndpoint);
+            sendBtn.setText("Send");
+            sendBtn.setEnabled(true);
+            statusLabel.setText("Canceled");
+            return;
+        }
+
         collectDataToModel();
 
         EndpointModel requestEndpoint = currentEndpoint;
@@ -814,10 +842,11 @@ public class EndpointDetailPanel extends JPanel {
             return;
         }
 
-        String endpointId = requestEndpoint.getId() != null
-                ? requestEndpoint.getId() : "legacy-" + System.identityHashCode(requestEndpoint);
-        long sequence = requestTracker.begin(endpointId);
-        sendBtn.setEnabled(false);
+        long uiGen = uiGenerationCounter.get();
+        vn.io.codelearning.springapitester.client.RequestExecutionContext context =
+                requestTracker.begin(requestEndpoint, uiGen);
+        sendBtn.setText("Cancel");
+        sendBtn.setEnabled(true);
         statusLabel.setText("Sending...");
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
@@ -825,34 +854,69 @@ public class EndpointDetailPanel extends JPanel {
                 Request request = HttpRequestBuilder.buildRequest(requestEndpoint, fullUrl);
                 HttpClientService.RequestHandle handle = HttpClientService.getInstance(project)
                         .execute(request, requestEndpoint.getInsecureTlsConsent());
+                context.setRequestHandle(handle);
                 activeRequests.add(handle);
                 handle.future().whenComplete((response, error) -> {
                     activeRequests.remove(handle);
-                    if (disposed || project.isDisposed()) return;
+                    if (disposed || project.isDisposed()) {
+                        context.dispose();
+                        return;
+                    }
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        if (disposed || project.isDisposed()) return;
-                        boolean latest = requestTracker.isLatest(endpointId, sequence);
-                        if (latest) {
-                            boolean showInUi = currentEndpoint == requestEndpoint;
-                            if (error == null) {
-                                applySuccessfulResponse(requestEndpoint, response, showInUi);
-                            } else {
-                                applyFailedResponse(requestEndpoint, "Error: " + rootMessage(error), showInUi);
-                            }
+                        if (disposed || project.isDisposed()) {
+                            context.dispose();
+                            return;
                         }
-                        requestTracker.clear(endpointId, sequence);
+                        // Atomically update target endpoint model
+                        if (error == null) {
+                            applySuccessfulResponse(requestEndpoint, response, false);
+                        } else {
+                            applyFailedResponse(requestEndpoint, "Error: " + rootMessage(error), false);
+                        }
+
+                        vn.io.codelearning.springapitester.model.EndpointIdentity currentIdentity = currentEndpoint != null
+                                ? vn.io.codelearning.springapitester.model.EndpointIdentity.fromEndpoint(currentEndpoint) : null;
+                        long visibleGen = uiGenerationCounter.get();
+                        boolean canRender = context.canRenderToUi(currentIdentity, visibleGen);
+
+                        if (canRender) {
+                            if (error == null) {
+                                context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.SUCCESS);
+                                applySuccessfulResponse(requestEndpoint, response, true);
+                            } else {
+                                context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
+                                applyFailedResponse(requestEndpoint, "Error: " + rootMessage(error), true);
+                            }
+                            sendBtn.setText("Send");
+                        } else {
+                            context.transitionToTerminal(error == null
+                                    ? vn.io.codelearning.springapitester.client.RequestExecutionState.SUCCESS
+                                    : vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
+                        }
                     });
                 });
             } catch (Exception error) {
-                if (disposed || project.isDisposed()) return;
+                if (disposed || project.isDisposed()) {
+                    context.dispose();
+                    return;
+                }
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    if (disposed || project.isDisposed()) return;
-                    boolean latest = requestTracker.isLatest(endpointId, sequence);
-                    if (latest) {
-                        applyFailedResponse(requestEndpoint, "Failed to build request: " + rootMessage(error),
-                                currentEndpoint == requestEndpoint);
+                    if (disposed || project.isDisposed()) {
+                        context.dispose();
+                        return;
                     }
-                    requestTracker.clear(endpointId, sequence);
+                    applyFailedResponse(requestEndpoint, "Failed to build request: " + rootMessage(error), false);
+                    vn.io.codelearning.springapitester.model.EndpointIdentity currentIdentity = currentEndpoint != null
+                            ? vn.io.codelearning.springapitester.model.EndpointIdentity.fromEndpoint(currentEndpoint) : null;
+                    long visibleGen = uiGenerationCounter.get();
+                    boolean canRender = context.canRenderToUi(currentIdentity, visibleGen);
+                    if (canRender) {
+                        context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
+                        applyFailedResponse(requestEndpoint, "Failed to build request: " + rootMessage(error), true);
+                        sendBtn.setText("Send");
+                    } else {
+                        context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
+                    }
                 });
             }
         });
