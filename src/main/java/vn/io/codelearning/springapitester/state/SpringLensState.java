@@ -301,7 +301,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     }
 
     public void pruneOrphanScannedEndpoints(List<vn.io.codelearning.springapitester.model.EndpointModel> currentScannedEndpoints) {
-        if (currentScannedEndpoints == null) return;
+        if (currentScannedEndpoints == null || currentScannedEndpoints.isEmpty()) return;
         Set<String> activeKeys = new HashSet<>();
         for (vn.io.codelearning.springapitester.model.EndpointModel ep : currentScannedEndpoints) {
             if (!ep.isManual()) {
