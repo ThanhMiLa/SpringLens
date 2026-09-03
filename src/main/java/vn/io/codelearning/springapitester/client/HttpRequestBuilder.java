@@ -54,7 +54,8 @@ public class HttpRequestBuilder {
         }
 
         // 3. Precedence: Auth headers > explicit @RequestHeader params > Custom Headers tab
-        java.util.Map<String, String> resolvedHeaders = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        java.util.Map<String, java.util.List<String>> customHeadersMap = new java.util.LinkedHashMap<>();
+        java.util.Map<String, String> explicitHeaders = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         java.util.Map<String, String> cookieParams = new java.util.LinkedHashMap<>();
 
         // Level 1: Custom Headers tab
@@ -66,7 +67,7 @@ public class HttpRequestBuilder {
                     if ("Cookie".equalsIgnoreCase(header.getKey())) {
                         cookieParams.putAll(RequestValidationUtil.parseCookieHeader(val));
                     } else {
-                        resolvedHeaders.put(header.getKey(), val);
+                        customHeadersMap.computeIfAbsent(header.getKey(), k -> new java.util.ArrayList<>()).add(val);
                     }
                 }
             }
@@ -81,7 +82,7 @@ public class HttpRequestBuilder {
                 }
                 if (!value.trim().isEmpty()) {
                     RequestValidationUtil.validateHeader(param.getName(), value);
-                    resolvedHeaders.put(param.getName(), value);
+                    explicitHeaders.put(param.getName(), value);
                 }
             }
         }
@@ -94,7 +95,7 @@ public class HttpRequestBuilder {
                     String token = auth.getBearerToken() != null ? auth.getBearerToken().trim() : "";
                     if (!token.isEmpty()) {
                         RequestValidationUtil.validateHeader("Authorization", "Bearer " + token);
-                        resolvedHeaders.put("Authorization", "Bearer " + token);
+                        explicitHeaders.put("Authorization", "Bearer " + token);
                     }
                     break;
                 case BASIC_AUTH:
@@ -103,7 +104,7 @@ public class HttpRequestBuilder {
                     String creds = user + ":" + pass;
                     String encoded = Base64.getEncoder().encodeToString(creds.getBytes(StandardCharsets.UTF_8));
                     RequestValidationUtil.validateHeader("Authorization", "Basic " + encoded);
-                    resolvedHeaders.put("Authorization", "Basic " + encoded);
+                    explicitHeaders.put("Authorization", "Basic " + encoded);
                     break;
                 case API_KEY:
                     String keyName = auth.getApiKeyName() != null ? auth.getApiKeyName() : "";
@@ -111,7 +112,7 @@ public class HttpRequestBuilder {
                     if (auth.isApiKeyInHeader()) {
                         if (!keyName.isEmpty()) {
                             RequestValidationUtil.validateHeader(keyName, keyValue);
-                            resolvedHeaders.put(keyName, keyValue);
+                            explicitHeaders.put(keyName, keyValue);
                         }
                     } else {
                         if (!keyName.isEmpty()) urlBuilder.addQueryParameter(keyName, keyValue);
@@ -139,7 +140,7 @@ public class HttpRequestBuilder {
         }
 
         if (!cookieParams.isEmpty()) {
-            resolvedHeaders.put("Cookie", RequestValidationUtil.formatCookieHeader(cookieParams));
+            explicitHeaders.put("Cookie", RequestValidationUtil.formatCookieHeader(cookieParams));
         }
 
         // 5. Gắn Body và HTTP Method
@@ -219,8 +220,17 @@ public class HttpRequestBuilder {
                 }
                 rawBytes = json.getBytes(StandardCharsets.UTF_8);
                 body = RequestBody.create(json, MediaType.parse("application/json; charset=utf-8"));
-                if (!resolvedHeaders.containsKey("Content-Type")) {
-                    resolvedHeaders.put("Content-Type", "application/json; charset=utf-8");
+                boolean hasContentType = explicitHeaders.containsKey("Content-Type");
+                if (!hasContentType) {
+                    for (String k : customHeadersMap.keySet()) {
+                        if ("Content-Type".equalsIgnoreCase(k)) {
+                            hasContentType = true;
+                            break;
+                        }
+                    }
+                }
+                if (!hasContentType) {
+                    explicitHeaders.put("Content-Type", "application/json; charset=utf-8");
                 }
             }
             
@@ -228,6 +238,22 @@ public class HttpRequestBuilder {
             body = null;
         }
 
-        return new ResolvedRequest(urlBuilder.build(), method, resolvedHeaders, cookieParams, body, rawBytes, multipartParts);
+        // Build headerList preserving multiple custom headers and precedence
+        java.util.List<java.util.Map.Entry<String, String>> headerList = new java.util.ArrayList<>();
+        java.util.Set<String> overridden = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        overridden.addAll(explicitHeaders.keySet());
+
+        for (java.util.Map.Entry<String, java.util.List<String>> entry : customHeadersMap.entrySet()) {
+            if (!overridden.contains(entry.getKey())) {
+                for (String v : entry.getValue()) {
+                    headerList.add(java.util.Map.entry(entry.getKey(), v));
+                }
+            }
+        }
+        for (java.util.Map.Entry<String, String> entry : explicitHeaders.entrySet()) {
+            headerList.add(java.util.Map.entry(entry.getKey(), entry.getValue()));
+        }
+
+        return new ResolvedRequest(urlBuilder.build(), method, headerList, cookieParams, body, rawBytes, multipartParts);
     }
 }

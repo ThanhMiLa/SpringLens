@@ -75,6 +75,17 @@ public class CurlBuilder {
                     ? "[REDACTED]" : request.headers().value(i);
             curl.append(" \\\n  -H ").append(escapeShellArg(name + ": " + val));
         }
+        if (request.body() != null) {
+            try {
+                okio.Buffer buffer = new okio.Buffer();
+                request.body().writeTo(buffer);
+                String bodyStr = buffer.readUtf8();
+                if (!bodyStr.isEmpty()) {
+                    curl.append(" \\\n  --data-raw ").append(escapeShellArg(bodyStr));
+                }
+            } catch (Exception ignored) {
+            }
+        }
         return curl.toString();
     }
 
@@ -83,7 +94,7 @@ public class CurlBuilder {
         StringBuilder curl = new StringBuilder("curl -X ").append(resolved.getMethod().name());
         curl.append(" ").append(escapeShellArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
 
-        for (Map.Entry<String, String> header : resolved.getHeaders().entrySet()) {
+        for (Map.Entry<String, String> header : resolved.getHeaderEntries()) {
             String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
                     ? "[REDACTED]" : header.getValue();
             curl.append(" \\\n  -H ").append(escapeShellArg(header.getKey() + ": " + val));
@@ -151,10 +162,10 @@ public class CurlBuilder {
             }
         }
 
-        if (!resolved.getHeaders().isEmpty()) {
+        if (!resolved.getHeaderEntries().isEmpty()) {
             ps.append(" -Headers @{");
             boolean first = true;
-            for (Map.Entry<String, String> header : resolved.getHeaders().entrySet()) {
+            for (Map.Entry<String, String> header : resolved.getHeaderEntries()) {
                 String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
                         ? "[REDACTED]" : header.getValue();
                 if (!first) ps.append("; ");
@@ -178,7 +189,7 @@ public class CurlBuilder {
         StringBuilder cmd = new StringBuilder("curl -X ").append(resolved.getMethod().name());
         cmd.append(" ").append(escapeCmdArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
 
-        for (Map.Entry<String, String> header : resolved.getHeaders().entrySet()) {
+        for (Map.Entry<String, String> header : resolved.getHeaderEntries()) {
             String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
                     ? "[REDACTED]" : header.getValue();
             cmd.append(" ^\n  -H ").append(escapeCmdArg(header.getKey() + ": " + val));
@@ -210,18 +221,31 @@ public class CurlBuilder {
         return cmd.toString();
     }
 
-    private static String sanitizeUrl(HttpUrl url, boolean includeCredentials) {
+    public static String sanitizeUrl(HttpUrl url, boolean includeCredentials) {
         if (url == null) return "";
         if (includeCredentials) return url.toString();
-        HttpUrl.Builder sanitized = url.newBuilder();
-        boolean modified = false;
+        if (url.querySize() == 0) return url.toString();
+
+        boolean hasSensitive = false;
         for (int i = 0; i < url.querySize(); i++) {
-            String qName = url.queryParameterName(i);
-            if (isSensitiveQueryParam(qName)) {
-                sanitized.setQueryParameter(qName, "[REDACTED]");
-                modified = true;
+            if (isSensitiveQueryParam(url.queryParameterName(i))) {
+                hasSensitive = true;
+                break;
             }
         }
-        return modified ? sanitized.build().toString() : url.toString();
+        if (!hasSensitive) return url.toString();
+
+        HttpUrl.Builder sanitized = url.newBuilder();
+        sanitized.query(null);
+        for (int i = 0; i < url.querySize(); i++) {
+            String qName = url.queryParameterName(i);
+            String qVal = url.queryParameterValue(i);
+            if (isSensitiveQueryParam(qName)) {
+                sanitized.addQueryParameter(qName, "[REDACTED]");
+            } else {
+                sanitized.addQueryParameter(qName, qVal);
+            }
+        }
+        return sanitized.build().toString();
     }
 }

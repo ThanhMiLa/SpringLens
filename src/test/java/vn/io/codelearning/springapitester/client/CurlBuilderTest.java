@@ -340,4 +340,41 @@ public class CurlBuilderTest {
         Assert.assertFalse(ps.contains("super-secret-token"));
         Assert.assertFalse(ps.contains("confidential-key"));
     }
+
+    @Test
+    public void testBuildCurlFromOkHttpRequestIncludesBody() {
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(
+                "{\"foo\":\"bar\"}", okhttp3.MediaType.parse("application/json"));
+        okhttp3.Request req = new okhttp3.Request.Builder()
+                .url("http://localhost:8080/api/direct")
+                .post(body)
+                .build();
+        String curl = CurlBuilder.buildCurl(req, false);
+        Assert.assertTrue(curl.contains("-X POST"));
+        Assert.assertTrue(curl.contains("--data-raw '{\"foo\":\"bar\"}'"));
+    }
+
+    @Test
+    public void testSanitizeUrlPreservesRepeatedQueryParams() {
+        okhttp3.HttpUrl url = okhttp3.HttpUrl.parse("http://localhost:8080/api?tag=java&tag=spring&token=secret123");
+        String sanitized = CurlBuilder.sanitizeUrl(url, false);
+        Assert.assertTrue(sanitized.contains("tag=java"));
+        Assert.assertTrue(sanitized.contains("tag=spring"));
+        Assert.assertTrue(sanitized.contains("token=[REDACTED]") || sanitized.contains("token=%5BREDACTED%5D"));
+        Assert.assertFalse(sanitized.contains("secret123"));
+    }
+
+    @Test
+    public void testMultiValueHeadersPreservedInResolvedRequestAndCurl() {
+        EndpointModel ep = new EndpointModel(HttpMethodEnum.GET, "/api/multi-header", "Ctrl", "pkg", "m");
+        ep.addCustomHeader(new HeaderItem("Accept", "application/json", true));
+        ep.addCustomHeader(new HeaderItem("Accept", "text/plain", true));
+
+        ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(ep, "http://localhost:8080/api/multi-header");
+        Assert.assertEquals(2, resolved.getHeaderEntries().size());
+
+        String curl = CurlBuilder.buildCurl(resolved, false);
+        Assert.assertTrue(curl.contains("-H 'Accept: application/json'"));
+        Assert.assertTrue(curl.contains("-H 'Accept: text/plain'"));
+    }
 }
