@@ -1,20 +1,34 @@
 # Plan 01: Restore Secure TLS Validation
 
-## Problem
+## Current Status
 
-`HttpClientService` trusts every certificate and hostname for every host, exposing HTTPS traffic to MITM attacks.
+**Substantially implemented, with verification gaps.** The default OkHttp client uses platform trust and hostname validation. An insecure client is created only for localhost or loopback hosts, and the UI requires confirmation before enabling it.
 
-## Implementation
+## Remaining Gaps and Risks
 
-1. Remove the unsafe trust manager and hostname verifier from the default client.
-2. Keep a separate insecure client only for explicitly confirmed localhost/loopback development use.
-3. Add `allowInsecureTls` with default `false` and a warning/confirmation in `EndpointDetailPanel`.
-4. Never log or persist certificates or TLS secrets.
+- The insecure choice is persisted and restored without showing the warning again. A copied or migrated endpoint can therefore retain insecure TLS longer than the user expects.
+- Current tests do not prove that a real certificate mismatch fails or that a valid test certificate succeeds.
+- The legacy JVM-wide fallback `HttpClientService.getInstance()` can still create an unscoped client. This weakens the project-service guarantee and should be removed under Plan 10.
+
+## Complete Remediation
+
+1. Keep insecure TLS endpoint-scoped, but store an explicit consent version and normalized target host or make consent session-only.
+2. Reconfirm after import, migration, or whenever the target host changes.
+3. Enforce the loopback restriction at the HTTP service boundary, regardless of UI state.
+4. Remove the global fallback client once all callers use the project service.
+5. Avoid logging certificate chains, authorization headers, or bodies from TLS failures.
+
+## Implementation Steps
+
+- Add an `InsecureTlsConsent` value containing the normalized host and policy version.
+- Validate the request host against that consent immediately before selecting the unsafe client.
+- Clear stale consent when an endpoint URL changes or is imported.
+- Replace no-project service access with `HttpClientService.getInstance(project)` only.
 
 ## Tests and Acceptance
 
-- Valid certificates work; self-signed certificates fail by default.
-- Hostname mismatches remain rejected in secure mode.
-- Insecure mode is opt-in, local-only, and never propagated silently.
-- The default path contains no `hostnameVerifier(... -> true)` or empty global trust manager.
-
+- Use MockWebServer with a trusted test certificate, a self-signed certificate, and a hostname mismatch.
+- Verify secure mode accepts only the trusted matching certificate.
+- Verify insecure mode works only for `localhost`, `127.0.0.0/8`, and `::1` after consent.
+- Verify reopening, importing, or changing a host does not silently reuse stale consent.
+- Confirm production code has no unconditional trust manager or hostname verifier.

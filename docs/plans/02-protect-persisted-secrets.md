@@ -1,21 +1,36 @@
 # Plan 02: Protect Persisted Secrets and Data
 
-## Problem
+## Current Status
 
-Auth credentials, headers, bodies, and responses are stored as plaintext in `spring-lens-state.xml`.
+**Partially implemented.** Authentication fields and recognized sensitive custom headers are stored in IntelliJ PasswordSafe. Request-body and response-history persistence are disabled by default, and persisted response headers are redacted.
 
-## Implementation
+## Remaining Gaps and Risks
 
-1. Remove credential values from `EndpointSavedState`; keep only an opaque credential ID.
-2. Store tokens, passwords, and API keys in IntelliJ PasswordSafe, scoped by project and endpoint identity.
-3. Add a `state/CredentialStore` for access, deletion, and legacy migration.
-4. Redact Authorization, Cookie, Set-Cookie, and configurable secret headers before persistence.
-5. Add a “Persist response history” option with a safe default and make Clear All Data delete credentials too.
+- Parameter values are still serialized directly into `spring-lens-state.xml`. This includes `HEADER`, `COOKIE`, and sensitive query parameters such as `Authorization`, `session`, `token`, or `apiKey`.
+- Manual endpoint parameters are cloned with plaintext `currentValue`, creating a second plaintext copy.
+- Sensitive classification is fixed and name-based. Custom secret names cannot be configured.
+- Opt-in response bodies may contain tokens or personal data; only response headers are redacted.
+- Existing tests inspect sanitized objects, not the actual XML produced by IntelliJ persistence.
+
+## Complete Remediation
+
+1. Introduce a central `SensitiveValueClassifier` for auth fields, headers, cookies, and parameter names/types.
+2. Move sensitive parameter values to PasswordSafe using stable endpoint and parameter identities.
+3. Persist only placeholders or empty values in both `paramValues` and `manualParameters`.
+4. Add configurable sensitive-name patterns while retaining conservative defaults.
+5. Treat response history as sensitive data: require explicit consent and optionally redact configured JSON fields.
+6. Make legacy migration transactional: write secrets, verify retrieval, and only then sanitize XML state.
+
+## Implementation Steps
+
+- Extend `CredentialStore.StoredSecrets` with values keyed by `ParamTypeEnum:name`.
+- Sanitize parameters through one method used by scanned and manual endpoints.
+- Restore secrets only in memory; never copy them into serializable state.
+- Delete endpoint and parameter credentials on endpoint deletion and Clear All Data.
 
 ## Tests and Acceptance
 
-- Serialized state contains no test token or password.
-- Legacy state migrates and is rewritten cleanly.
-- Credentials are isolated and fully deleted by clear actions.
-- Secrets never appear in logs, exceptions, or snapshots.
-
+- Serialize a real `SpringLensState` and assert tokens, cookies, passwords, and API keys are absent from XML.
+- Cover scanned/manual endpoints, configurable names, migration failure, deletion, and project isolation.
+- Verify redaction is case-insensitive and covers authorization, cookies, proxy auth, and token-like names.
+- Verify logs, exceptions, persisted snapshots, and default exports do not expose test secrets.
