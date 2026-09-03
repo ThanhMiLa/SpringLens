@@ -53,6 +53,17 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         }
         if (state.manualEndpoints != null) {
             this.manualEndpoints = state.manualEndpoints;
+            for (EndpointSavedState manual : this.manualEndpoints) {
+                if (manual.path != null) {
+                    String sanitized = vn.io.codelearning.springapitester.util.UrlResolutionUtil.sanitizeCorruptedUrl(manual.path);
+                    if (!sanitized.equals(manual.path)) {
+                        manual.path = sanitized;
+                        manual.isAbsoluteUrl = true;
+                    } else if (vn.io.codelearning.springapitester.util.UrlResolutionUtil.isAbsoluteUrl(manual.path)) {
+                        manual.isAbsoluteUrl = true;
+                    }
+                }
+            }
         }
         this.gatewayModeEnabled = state.gatewayModeEnabled;
         this.persistRequestBodies = state.persistRequestBodies;
@@ -112,6 +123,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             saved.id = endpoint.getId();
             saved.name = endpoint.getName();
             saved.isManual = true;
+            saved.isAbsoluteUrl = endpoint.isAbsoluteUrl();
             saved.folderId = endpoint.getFolderId();
             saved.httpMethod = endpoint.getHttpMethod();
             saved.path = endpoint.getPath();
@@ -198,6 +210,13 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             saved = endpoints.get(legacyKey);
         }
         if (saved == null) return;
+
+        if (endpoint.isManual()) {
+            endpoint.setAbsoluteUrl(saved.isAbsoluteUrl);
+            if (saved.path != null && !saved.path.isEmpty()) {
+                endpoint.setPath(saved.path);
+            }
+        }
 
         // Restore Auth & Headers
         endpoint.setAuthConfig(resolveAuthConfig(saved));

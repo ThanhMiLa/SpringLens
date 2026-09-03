@@ -33,6 +33,7 @@ public class EndpointSavedState {
     public String id;
     public String name;
     public boolean isManual = false;
+    public boolean isAbsoluteUrl = false;
     public String folderId;
     public vn.io.codelearning.springapitester.model.HttpMethodEnum httpMethod;
     public String path;

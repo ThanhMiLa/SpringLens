@@ -13,6 +13,7 @@ public class EndpointModel {
     private String id;
     private String name;
     private boolean isManual = false;
+    private boolean isAbsoluteUrl = false;
     private String folderId;
     private HttpMethodEnum httpMethod;
     private String path;
@@ -289,6 +290,9 @@ public class EndpointModel {
     
     public boolean isManual() { return isManual; }
     public void setManual(boolean manual) { isManual = manual; }
+
+    public boolean isAbsoluteUrl() { return isAbsoluteUrl; }
+    public void setAbsoluteUrl(boolean absoluteUrl) { this.isAbsoluteUrl = absoluteUrl; }
     
     public String getFolderId() { return folderId; }
     public void setFolderId(String folderId) { this.folderId = folderId; }

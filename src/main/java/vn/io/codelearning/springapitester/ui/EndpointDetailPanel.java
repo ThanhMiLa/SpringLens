@@ -157,12 +157,18 @@ public class EndpointDetailPanel extends JPanel {
         urlField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             private void update() {
                 if (!isUpdatingUI && currentEndpoint != null) {
-                    String url = urlField.getText();
-                    String effectiveBaseUrl = getEffectiveBaseUrl(currentEndpoint);
-                    if (url.startsWith(effectiveBaseUrl)) {
-                        currentEndpoint.setPath(url.substring(effectiveBaseUrl.length()));
-                    } else {
+                    String url = urlField.getText().trim();
+                    if (vn.io.codelearning.springapitester.util.UrlResolutionUtil.isAbsoluteUrl(url)) {
+                        currentEndpoint.setAbsoluteUrl(true);
                         currentEndpoint.setPath(url);
+                    } else {
+                        currentEndpoint.setAbsoluteUrl(false);
+                        String effectiveBaseUrl = getEffectiveBaseUrl(currentEndpoint);
+                        if (!effectiveBaseUrl.isEmpty() && url.startsWith(effectiveBaseUrl)) {
+                            currentEndpoint.setPath(url.substring(effectiveBaseUrl.length()));
+                        } else {
+                            currentEndpoint.setPath(url);
+                        }
                     }
                     if (onEndpointUpdated != null) {
                         onEndpointUpdated.run();
@@ -565,8 +571,9 @@ public class EndpointDetailPanel extends JPanel {
             updateMethodComboColor(method);
 
             String effectiveBaseUrl = getEffectiveBaseUrl(endpoint);
-            String fullUrl = effectiveBaseUrl + endpoint.getPath();
-            urlField.setText(fullUrl.replace("//", "/").replace("http:/l", "http://l").replace("https:/l", "https://l"));
+            String fullUrl = vn.io.codelearning.springapitester.util.UrlResolutionUtil.resolveFullUrl(
+                    effectiveBaseUrl, endpoint.getPath(), endpoint.isAbsoluteUrl());
+            urlField.setText(fullUrl);
 
             paramPanel.setParameters(endpoint.getParameters());
             headerParamPanel.setParameters(endpoint.getParameters());
@@ -881,7 +888,12 @@ public class EndpointDetailPanel extends JPanel {
 
     private String getEffectiveBaseUrl(EndpointModel endpoint) {
         if (endpoint == null) return baseUrl != null ? baseUrl : "http://localhost:8080";
-        if (endpoint.isManual()) return baseUrl != null ? baseUrl : "http://localhost:8080";
+        if (endpoint.isManual()) {
+            if (endpoint.isAbsoluteUrl()) {
+                return "";
+            }
+            return baseUrl != null ? baseUrl : "http://localhost:8080";
+        }
         
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
         if (state != null && state.gatewayModeEnabled && cachedGatewayConfig != null) {
