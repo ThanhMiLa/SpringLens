@@ -25,15 +25,20 @@ public final class CredentialStore {
         this(project.getLocationHash(), new PasswordSafeBackend());
     }
 
-    CredentialStore(String scope, Backend backend) {
+    public CredentialStore(String scope, Backend backend) {
         this.scope = scope;
         this.backend = backend;
     }
 
     public void save(String credentialId, AuthConfig authConfig, Map<Integer, String> secretHeaders) {
+        save(credentialId, authConfig, secretHeaders, java.util.Collections.emptyMap());
+    }
+
+    public void save(String credentialId, AuthConfig authConfig, Map<Integer, String> secretHeaders, Map<String, String> secretParams) {
         StoredSecrets secrets = new StoredSecrets();
         secrets.authConfig = authConfig != null ? authConfig.cloneConfig() : new AuthConfig();
         if (secretHeaders != null) secrets.headerValues.putAll(secretHeaders);
+        if (secretParams != null) secrets.parameterValues.putAll(secretParams);
         backend.set(serviceName(credentialId), GSON.toJson(secrets));
     }
 
@@ -108,26 +113,33 @@ public final class CredentialStore {
     }
 
     public static boolean isSensitiveHeader(String key) {
-        if (key == null) return false;
-        String normalized = key.trim().toLowerCase(Locale.ROOT);
-        return normalized.equals("authorization")
-                || normalized.equals("proxy-authorization")
-                || normalized.equals("cookie")
-                || normalized.equals("set-cookie")
-                || normalized.contains("api-key")
-                || normalized.contains("apikey")
-                || normalized.contains("token")
-                || normalized.contains("secret");
+        return SensitiveValueClassifier.isSensitiveHeader(key);
     }
 
     public static final class StoredSecrets {
         public AuthConfig authConfig = new AuthConfig();
         public Map<Integer, String> headerValues = new HashMap<>();
+        public Map<String, String> parameterValues = new HashMap<>();
     }
 
-    interface Backend {
+    public interface Backend {
         String get(String serviceName);
         void set(String serviceName, String value);
+    }
+
+    public static final class MemoryBackend implements Backend {
+        private final Map<String, String> values = new HashMap<>();
+
+        @Override
+        public String get(String serviceName) {
+            return values.get(serviceName);
+        }
+
+        @Override
+        public void set(String serviceName, String value) {
+            if (value == null) values.remove(serviceName);
+            else values.put(serviceName, value);
+        }
     }
 
     private static final class PasswordSafeBackend implements Backend {

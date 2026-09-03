@@ -83,7 +83,6 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
                 : endpoints.get(getEndpointKey(endpoint));
         saved.credentialId = oldSaved != null && oldSaved.credentialId != null && !oldSaved.credentialId.isBlank()
                 ? oldSaved.credentialId : UUID.randomUUID().toString();
-        storeCredentials(saved, endpoint.getAuthConfig(), endpoint.getCustomHeaders());
         saved.requestBodyJson = persistRequestBodies ? endpoint.getRequestBodyJson() : "";
         saved.bodyType = endpoint.getBodyType();
         saved.allowInsecureTls = endpoint.isAllowInsecureTls();
@@ -99,6 +98,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         // Response Cache
         if (persistResponseHistory) {
             String rawBody = endpoint.getLastResponseBody();
+            rawBody = SensitiveValueClassifier.redactSensitiveJson(rawBody);
             if (rawBody != null && rawBody.length() > MAX_PERSISTED_BODY_BYTES) {
                 byte[] rawBytes = rawBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                 int safeBoundary = vn.io.codelearning.springapitester.client.ResponseReader.findSafeUtf8Boundary(
@@ -122,13 +122,18 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             saved.hasSecuredOverride = false;
         }
 
+        Map<String, String> parameterSecrets = new HashMap<>();
         saved.paramValues.clear();
         saved.paramEnabled.clear();
         for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() != null && param.getName() != null) {
                 String typeKey = param.getParamType().name() + ":" + param.getName();
-                if (param.getCurrentValue() != null) {
-                    saved.paramValues.put(typeKey, param.getCurrentValue());
+                String rawVal = param.getCurrentValue() != null ? param.getCurrentValue() : "";
+                if (SensitiveValueClassifier.isSensitive(param.getName(), param.getParamType()) && !rawVal.isEmpty()) {
+                    parameterSecrets.put(typeKey, rawVal);
+                    saved.paramValues.put(typeKey, ""); // Sanitize in XML state
+                } else {
+                    saved.paramValues.put(typeKey, rawVal);
                 }
                 saved.paramEnabled.put(typeKey, param.isEnabled());
             }
@@ -143,15 +148,28 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             saved.folderId = endpoint.getFolderId();
             saved.httpMethod = endpoint.getHttpMethod();
             saved.path = endpoint.getPath();
-            // Deep copy parameters
+            // Deep copy parameters, sanitizing sensitive values in XML
             saved.manualParameters = new java.util.ArrayList<>();
             for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
                 vn.io.codelearning.springapitester.model.ParameterModel clone = new vn.io.codelearning.springapitester.model.ParameterModel();
                 clone.setName(param.getName());
                 clone.setParamType(param.getParamType());
-                clone.setCurrentValue(param.getCurrentValue());
+                String rawVal = param.getCurrentValue() != null ? param.getCurrentValue() : "";
+                String typeKey = (param.getParamType() != null ? param.getParamType().name() : "QUERY_PARAM") + ":" + param.getName();
+                if (SensitiveValueClassifier.isSensitive(param.getName(), param.getParamType())) {
+                    if (rawVal.isEmpty() && param.getDefaultValue() != null && !param.getDefaultValue().isEmpty()) {
+                        rawVal = param.getDefaultValue();
+                    }
+                    if (!rawVal.isEmpty()) {
+                        parameterSecrets.put(typeKey, rawVal);
+                    }
+                    clone.setCurrentValue(""); // Sanitize in XML state
+                    clone.setDefaultValue(""); // Sanitize in XML state
+                } else {
+                    clone.setCurrentValue(rawVal);
+                    clone.setDefaultValue(param.getDefaultValue());
+                }
                 clone.setRequired(param.isRequired());
-                clone.setDefaultValue(param.getDefaultValue());
                 clone.setEnabled(param.isEnabled());
                 saved.manualParameters.add(clone);
             }
@@ -162,6 +180,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         } else {
             endpoints.put(key, saved);
         }
+        storeCredentials(saved, endpoint.getAuthConfig(), endpoint.getCustomHeaders(), parameterSecrets);
         enforceResponseStorageQuota();
     }
 
@@ -280,11 +299,15 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             endpoint.setSecured(saved.isSecuredOverride);
         }
 
+        CredentialStore.StoredSecrets secrets = loadSecrets(saved);
+
         // Smart Merge Parameters
         for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() != null && param.getName() != null) {
                 String typeKey = param.getParamType().name() + ":" + param.getName();
-                if (saved.paramValues.containsKey(typeKey)) {
+                if (secrets != null && secrets.parameterValues != null && secrets.parameterValues.containsKey(typeKey)) {
+                    param.setCurrentValue(secrets.parameterValues.get(typeKey));
+                } else if (saved.paramValues.containsKey(typeKey)) {
                     param.setCurrentValue(saved.paramValues.get(typeKey));
                 } else if (saved.paramValues.containsKey(param.getName())) {
                     param.setCurrentValue(saved.paramValues.get(param.getName()));
@@ -293,6 +316,18 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
                     param.setEnabled(saved.paramEnabled.get(typeKey));
                 }
             }
+        }
+        if (endpoint.isManual() && saved.manualParameters != null) {
+            java.util.List<vn.io.codelearning.springapitester.model.ParameterModel> restored = new java.util.ArrayList<>();
+            for (vn.io.codelearning.springapitester.model.ParameterModel p : saved.manualParameters) {
+                vn.io.codelearning.springapitester.model.ParameterModel clone = p.clone();
+                String typeKey = (p.getParamType() != null ? p.getParamType().name() : "QUERY_PARAM") + ":" + p.getName();
+                if (secrets != null && secrets.parameterValues != null && secrets.parameterValues.containsKey(typeKey)) {
+                    clone.setCurrentValue(secrets.parameterValues.get(typeKey));
+                }
+                restored.add(clone);
+            }
+            endpoint.setParameters(restored);
         }
 
         // Restore Response Cache
@@ -331,8 +366,9 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         if (saved.credentialId == null || saved.credentialId.isBlank()) saved.credentialId = UUID.randomUUID().toString();
         CredentialStore.StoredSecrets existing = loadSecrets(saved);
         Map<Integer, String> headers = existing != null ? existing.headerValues : new HashMap<>();
+        Map<String, String> params = existing != null ? existing.parameterValues : new HashMap<>();
         CredentialStore store = credentialStore();
-        if (store != null) store.save(saved.credentialId, authConfig, headers);
+        if (store != null) store.save(saved.credentialId, authConfig, headers, params);
         saved.authConfig = CredentialStore.sanitizeAuth(authConfig);
     }
 
@@ -343,9 +379,12 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         }
     }
 
+    private final CredentialStore fallbackMemoryStore = new CredentialStore("memory", new CredentialStore.MemoryBackend());
+
     private CredentialStore credentialStore() {
         if (credentialStoreOverride != null) return credentialStoreOverride;
-        return project != null && !project.isDisposed() ? new CredentialStore(project) : null;
+        if (project != null && !project.isDisposed()) return new CredentialStore(project);
+        return fallbackMemoryStore;
     }
 
     void attachCredentialStoreForTest(CredentialStore store) {
@@ -354,12 +393,13 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     }
 
     private void storeCredentials(EndpointSavedState saved, AuthConfig authConfig,
-                                  List<vn.io.codelearning.springapitester.model.HeaderItem> headers) {
+                                  List<vn.io.codelearning.springapitester.model.HeaderItem> headers,
+                                  Map<String, String> parameterSecrets) {
         Map<Integer, String> headerSecrets = new HashMap<>();
         saved.authConfig = CredentialStore.sanitizeAuth(authConfig);
         saved.customHeaders = CredentialStore.sanitizeHeaders(headers, headerSecrets);
         CredentialStore store = credentialStore();
-        if (store != null) store.save(saved.credentialId, authConfig, headerSecrets);
+        if (store != null) store.save(saved.credentialId, authConfig, headerSecrets, parameterSecrets);
     }
 
     private CredentialStore.StoredSecrets loadSecrets(EndpointSavedState saved) {
@@ -371,9 +411,49 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         CredentialStore store = credentialStore();
         if (store == null) return;
         for (EndpointSavedState saved : allSavedEndpoints()) {
-            if (CredentialStore.containsSecrets(saved.authConfig, saved.customHeaders)) {
+            boolean hasAuthSecrets = CredentialStore.containsSecrets(saved.authConfig, saved.customHeaders);
+            boolean hasParamSecrets = false;
+            Map<String, String> paramSecrets = new HashMap<>();
+            for (Map.Entry<String, String> entry : saved.paramValues.entrySet()) {
+                String key = entry.getKey();
+                int idx = key.indexOf(':');
+                String name = idx >= 0 ? key.substring(idx + 1) : key;
+                String typeStr = idx >= 0 ? key.substring(0, idx) : "QUERY_PARAM";
+                vn.io.codelearning.springapitester.model.ParamTypeEnum type = null;
+                try { type = vn.io.codelearning.springapitester.model.ParamTypeEnum.valueOf(typeStr); } catch (Exception ignored) {}
+                if (SensitiveValueClassifier.isSensitive(name, type) && entry.getValue() != null && !entry.getValue().isEmpty()) {
+                    hasParamSecrets = true;
+                    paramSecrets.put(key, entry.getValue());
+                }
+            }
+            if (hasAuthSecrets || hasParamSecrets) {
                 if (saved.credentialId == null || saved.credentialId.isBlank()) saved.credentialId = UUID.randomUUID().toString();
-                storeCredentials(saved, saved.authConfig, saved.customHeaders);
+                Map<Integer, String> headerSecrets = new HashMap<>();
+                for (int i = 0; i < saved.customHeaders.size(); i++) {
+                    vn.io.codelearning.springapitester.model.HeaderItem item = saved.customHeaders.get(i);
+                    if (SensitiveValueClassifier.isSensitiveHeader(item.getKey()) && item.getValue() != null && !item.getValue().isEmpty()) {
+                        headerSecrets.put(i, item.getValue());
+                    }
+                }
+                // 1. Write to PasswordSafe
+                store.save(saved.credentialId, saved.authConfig, headerSecrets, paramSecrets);
+                // 2. Transactionally verify retrieval
+                CredentialStore.StoredSecrets retrieved = store.load(saved.credentialId);
+                if (retrieved != null) {
+                    // 3. Sanitize in state XML only after verification
+                    saved.authConfig = CredentialStore.sanitizeAuth(saved.authConfig);
+                    saved.customHeaders = CredentialStore.sanitizeHeaders(saved.customHeaders, new HashMap<>());
+                    for (String secretKey : paramSecrets.keySet()) {
+                        saved.paramValues.put(secretKey, "");
+                    }
+                    if (saved.manualParameters != null) {
+                        for (vn.io.codelearning.springapitester.model.ParameterModel p : saved.manualParameters) {
+                            if (SensitiveValueClassifier.isSensitive(p.getName(), p.getParamType())) {
+                                p.setCurrentValue("");
+                            }
+                        }
+                    }
+                }
             }
         }
     }

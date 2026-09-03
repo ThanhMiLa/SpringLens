@@ -96,6 +96,19 @@ public class ParameterModel {
         this.enabled = enabled;
     }
 
+    public ParameterModel clone() {
+        ParameterModel copy = new ParameterModel();
+        copy.setName(this.name);
+        copy.setParamType(this.paramType);
+        copy.setDataType(this.dataType);
+        copy.setDefaultValue(this.defaultValue);
+        copy.setRequired(this.required);
+        copy.setCurrentValue(this.currentValue);
+        copy.setDescription(this.description);
+        copy.setEnabled(this.enabled);
+        return copy;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

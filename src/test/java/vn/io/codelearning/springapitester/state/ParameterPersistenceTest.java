@@ -33,7 +33,7 @@ public class ParameterPersistenceTest {
         Assert.assertNotNull(saved);
         Assert.assertEquals("active", saved.paramValues.get("QUERY_PARAM:filter"));
         Assert.assertEquals("tenant-a", saved.paramValues.get("HEADER:X-Tenant"));
-        Assert.assertEquals("sess-123", saved.paramValues.get("COOKIE:session"));
+        Assert.assertEquals("", saved.paramValues.get("COOKIE:session")); // Protected in PasswordSafe per Plan 02
 
         Assert.assertEquals(Boolean.TRUE, saved.paramEnabled.get("QUERY_PARAM:filter"));
         Assert.assertEquals(Boolean.FALSE, saved.paramEnabled.get("HEADER:X-Tenant"));
