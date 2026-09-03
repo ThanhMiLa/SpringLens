@@ -24,12 +24,38 @@ public class EndpointSavedState {
     public boolean hasSecuredOverride = false;
 
     // Response Cache
+    public static final int MAX_RESPONSE_HISTORY_ENTRIES = 20;
+
+    public static class ResponseHistoryEntry {
+        public long timestamp = System.currentTimeMillis();
+        public int statusCode = 0;
+        public String statusMessage = "";
+        public long timeTakenMs = 0;
+        public String responseBody = "";
+        public String responseHeaders = "";
+        public String responseFormat = "JSON";
+
+        public ResponseHistoryEntry() {}
+
+        public ResponseHistoryEntry(int statusCode, String statusMessage, long timeTakenMs,
+                                    String responseBody, String responseHeaders, String responseFormat) {
+            this.timestamp = System.currentTimeMillis();
+            this.statusCode = statusCode;
+            this.statusMessage = statusMessage;
+            this.timeTakenMs = timeTakenMs;
+            this.responseBody = responseBody;
+            this.responseHeaders = responseHeaders;
+            this.responseFormat = responseFormat;
+        }
+    }
+
     public String lastResponseBody = "";
     public int lastResponseStatusCode = 0;
     public String lastResponseStatusMessage = "";
     public long lastResponseTimeTakenMs = 0;
     public String lastResponseHeaders = "";
     public String lastResponseFormat = "JSON";
+    public List<ResponseHistoryEntry> responseHistory = new ArrayList<>();
     
     // Module 7: Fields for manual endpoints
     public String id;

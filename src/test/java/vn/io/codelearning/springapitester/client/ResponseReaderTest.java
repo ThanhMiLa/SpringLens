@@ -152,4 +152,80 @@ public class ResponseReaderTest {
         // Must be capped by MAX_TOTAL_RESPONSE_STORAGE_BYTES
         Assert.assertTrue(totalStorage <= SpringLensState.MAX_TOTAL_RESPONSE_STORAGE_BYTES);
     }
+
+    @Test
+    public void testStreamingLargePayloadHaltsWithoutOOM() throws IOException {
+        // Create an OkHttp ResponseBody backed by a custom Source generating 100 MB on the fly
+        final long hundredMb = 100L * 1024 * 1024;
+        okio.Source syntheticLargeSource = new okio.Source() {
+            private long generated = 0;
+            @Override
+            public long read(okio.Buffer sink, long byteCount) {
+                if (generated >= hundredMb) return -1;
+                long toProduce = Math.min(byteCount, hundredMb - generated);
+                byte[] chunk = new byte[(int) Math.min(toProduce, 65536)];
+                Arrays.fill(chunk, (byte) 'A');
+                sink.write(chunk);
+                generated += chunk.length;
+                return chunk.length;
+            }
+            @Override public okio.Timeout timeout() { return okio.Timeout.NONE; }
+            @Override public void close() {}
+        };
+
+        ResponseBody body = ResponseBody.create(
+                MediaType.parse("text/plain"),
+                hundredMb,
+                okio.Okio.buffer(syntheticLargeSource)
+        );
+
+        int maxLimit = 1024 * 1024; // 1 MB cap
+        ResponseReader.ReadResult result = ResponseReader.readBody(body, "text/plain", maxLimit);
+
+        Assert.assertTrue(result.isTruncated());
+        Assert.assertEquals(hundredMb, result.getTotalBytes());
+        Assert.assertTrue(result.getRawBytes().length <= maxLimit);
+        Assert.assertTrue(result.getText().contains("... [truncated: showing"));
+    }
+
+    @Test
+    public void testResponseHistoryBoundedAndEvictsOldest() {
+        SpringLensState state = new SpringLensState();
+        state.persistResponseHistory = true;
+
+        EndpointModel ep = new EndpointModel(HttpMethodEnum.POST, "/api/history", "Controller", "Pkg", "method");
+        state.saveEndpoint(ep);
+
+        // Save 30 distinct responses sequentially
+        for (int i = 1; i <= 30; i++) {
+            ep.setLastResponseStatusCode(200);
+            ep.setLastResponseStatusMessage("OK " + i);
+            ep.setLastResponseBody("{\"run\":" + i + "}");
+            ep.setLastResponseTimeTakenMs(i * 10L);
+            state.saveEndpoint(ep);
+        }
+
+        EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(ep));
+        Assert.assertNotNull(saved);
+        Assert.assertEquals(EndpointSavedState.MAX_RESPONSE_HISTORY_ENTRIES, saved.responseHistory.size());
+
+        // The oldest remaining entry should be run #11 (1..10 evicted)
+        Assert.assertEquals("OK 11", saved.responseHistory.get(0).statusMessage);
+        // The newest remaining entry should be run #30
+        Assert.assertEquals("OK 30", saved.responseHistory.get(19).statusMessage);
+    }
+
+    @Test
+    public void testRawResponseBytesFidelityPreserved() {
+        byte[] originalBinary = new byte[]{(byte) 0x00, (byte) 0xFF, (byte) 0xFE, (byte) 0x12, (byte) 0x34};
+        EndpointModel ep = new EndpointModel(HttpMethodEnum.GET, "/api/binary", "C", "P", "m");
+        ep.setLastResponseRawBytes(originalBinary);
+
+        byte[] retrieved = ep.getLastResponseRawBytes();
+        Assert.assertArrayEquals(originalBinary, retrieved);
+
+        // Mutation on returned array does not affect stored array
+        retrieved[0] = (byte) 0xAA;
+        Assert.assertEquals((byte) 0x00, ep.getLastResponseRawBytes()[0]);
+    }
 }

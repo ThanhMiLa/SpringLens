@@ -397,4 +397,14 @@ public class EndpointModel {
     public void setLastResponseFormat(String lastResponseFormat) {
         this.lastResponseFormat = (lastResponseFormat != null && !lastResponseFormat.isBlank()) ? lastResponseFormat : "JSON";
     }
+
+    private byte[] lastResponseRawBytes;
+
+    public byte[] getLastResponseRawBytes() {
+        return lastResponseRawBytes != null ? lastResponseRawBytes.clone() : new byte[0];
+    }
+
+    public void setLastResponseRawBytes(byte[] lastResponseRawBytes) {
+        this.lastResponseRawBytes = (lastResponseRawBytes != null) ? lastResponseRawBytes.clone() : new byte[0];
+    }
 }

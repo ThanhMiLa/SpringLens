@@ -105,20 +105,39 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         if (persistResponseHistory) {
             String rawBody = endpoint.getLastResponseBody();
             rawBody = SensitiveValueClassifier.redactSensitiveJson(rawBody);
+            String persistedBody;
             if (rawBody != null && rawBody.length() > MAX_PERSISTED_BODY_BYTES) {
                 byte[] rawBytes = rawBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                 int safeBoundary = vn.io.codelearning.springapitester.client.ResponseReader.findSafeUtf8Boundary(
                         rawBytes, Math.min(rawBytes.length, MAX_PERSISTED_BODY_BYTES));
-                saved.lastResponseBody = new String(rawBytes, 0, safeBoundary, java.nio.charset.StandardCharsets.UTF_8)
-                        + "\n\n--- [Persisted snapshot truncated at 256 KB] ---";
+                persistedBody = new String(rawBytes, 0, safeBoundary, java.nio.charset.StandardCharsets.UTF_8)
+                        + "\n\n... [truncated: showing " + safeBoundary + " of " + rawBytes.length + " bytes] --- [Persisted snapshot truncated at 256 KB] ---";
             } else {
-                saved.lastResponseBody = rawBody != null ? rawBody : "";
+                persistedBody = rawBody != null ? rawBody : "";
             }
+            saved.lastResponseBody = persistedBody;
             saved.lastResponseStatusCode = endpoint.getLastResponseStatusCode();
             saved.lastResponseStatusMessage = endpoint.getLastResponseStatusMessage();
             saved.lastResponseTimeTakenMs = endpoint.getLastResponseTimeTakenMs();
             saved.lastResponseHeaders = redactResponseHeaders(endpoint.getLastResponseHeaders());
             saved.lastResponseFormat = endpoint.getLastResponseFormat();
+
+            if (oldSaved != null && oldSaved.responseHistory != null) {
+                saved.responseHistory.addAll(oldSaved.responseHistory);
+            }
+            if (endpoint.getLastResponseStatusCode() > 0) {
+                saved.responseHistory.add(new EndpointSavedState.ResponseHistoryEntry(
+                        saved.lastResponseStatusCode,
+                        saved.lastResponseStatusMessage,
+                        saved.lastResponseTimeTakenMs,
+                        saved.lastResponseBody,
+                        saved.lastResponseHeaders,
+                        saved.lastResponseFormat
+                ));
+                while (saved.responseHistory.size() > EndpointSavedState.MAX_RESPONSE_HISTORY_ENTRIES) {
+                    saved.responseHistory.remove(0);
+                }
+            }
         }
 
         // Inherit the previous override state so we don't accidentally lock all endpoints

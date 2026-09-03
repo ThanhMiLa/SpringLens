@@ -961,8 +961,11 @@ public class EndpointDetailPanel extends JPanel {
         if (userSelection == javax.swing.JFileChooser.APPROVE_OPTION) {
             java.io.File fileToSave = fileChooser.getSelectedFile();
             try {
-                if (lastResponseRawBytes != null && lastResponseRawBytes.length > 0) {
-                    java.nio.file.Files.write(fileToSave.toPath(), lastResponseRawBytes);
+                byte[] rawBytes = currentEndpoint != null && currentEndpoint.getLastResponseRawBytes().length > 0
+                        ? currentEndpoint.getLastResponseRawBytes()
+                        : lastResponseRawBytes;
+                if (rawBytes != null && rawBytes.length > 0) {
+                    java.nio.file.Files.write(fileToSave.toPath(), rawBytes);
                 } else {
                     String text = responseBodyEditor.getDocument().getText();
                     java.nio.file.Files.writeString(fileToSave.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
@@ -984,6 +987,7 @@ public class EndpointDetailPanel extends JPanel {
         String headers = formatResponseHeaders(response);
         String format = detectResponseFormat(response);
         this.lastResponseRawBytes = response.getRawBytes();
+        endpoint.setLastResponseRawBytes(response.getRawBytes());
 
         endpoint.setLastResponseStatusCode(code);
         endpoint.setLastResponseStatusMessage(message);

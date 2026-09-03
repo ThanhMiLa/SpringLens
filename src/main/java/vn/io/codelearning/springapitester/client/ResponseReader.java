@@ -154,7 +154,7 @@ public final class ResponseReader {
             String mime = (contentType != null && !contentType.isBlank()) ? contentType : "application/octet-stream";
             String note = "[Binary data: " + mime + ", " + formatByteSize(totalBytes) + "]";
             if (isTruncated) {
-                note += "\n\n--- [Binary preview truncated at " + formatByteSize(maxBytes) + ". Total size: " + formatByteSize(totalBytes) + "] ---";
+                note += "\n\n... [truncated: showing " + previewBytes.length + " of " + totalBytes + " bytes] --- [Binary preview truncated at " + formatByteSize(maxBytes) + ". Total size: " + formatByteSize(totalBytes) + "] ---";
             }
             return new ReadResult(note, true, isTruncated, totalBytes, previewBytes);
         }
@@ -165,7 +165,7 @@ public final class ResponseReader {
 
         String text = new String(previewBytes, 0, safeBoundary, StandardCharsets.UTF_8);
         if (isTruncated) {
-            text += "\n\n--- [Response truncated at " + formatByteSize(maxBytes) + ". Total size: " + formatByteSize(totalBytes) + "] ---";
+            text += "\n\n... [truncated: showing " + safeBoundary + " of " + totalBytes + " bytes] --- [Response truncated at " + formatByteSize(maxBytes) + ". Total size: " + formatByteSize(totalBytes) + "] ---";
         }
 
         return new ReadResult(text, false, isTruncated, totalBytes, previewBytes);
