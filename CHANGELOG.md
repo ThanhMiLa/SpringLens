@@ -2,6 +2,35 @@
 
 # SpringLens Changelog
 
+## [1.1.2] - 2026-09-03
+
+### Added
+- **Isolated HTTP Sessions per Project:** Bound `HttpClientService` and in-memory RFC 6265 cookie jars to individual IntelliJ projects, preventing cross-project session leakage and state pollution.
+- **Multi-Platform Request Export:** Added hardened export options for cURL (POSIX-compliant shell quoting), Windows PowerShell, and Windows CMD, with full support for multi-value headers and repeated query parameters.
+- **Absolute URL & Gateway Routing for Manual Endpoints:** Enabled direct entry of absolute URLs (`http://`, `https://`) for manual endpoints, bypassing direct base URL prefixing while maintaining gateway routing resolution.
+- **Deterministic Spring Config Resolution:** Introduced `SpringConfigResolutionService` supporting multi-document YAML, active profile matching (`spring.profiles.active` with comma-separated and list formats), placeholder interpolation (`${...}` with fallback defaults), and `spring.config.import`.
+- **Multipart File Upload Validation:** Added pre-flight file existence checks, read permission validation, and a 100MB file size safeguard for multipart requests.
+- **Schema v3 State Keys:** Upgraded endpoint state identification to include HTTP method, module name, and path to prevent key collisions across controllers.
+
+### Changed
+- **Unified Manual Endpoint Restoration:** Refactored manual endpoint loading to delegate to `state.restoreEndpoint()`, ensuring full parity with scanned endpoints for secret decryption, TLS consent, and parameter restoration.
+- **Streamlined Response Reading:** Removed wasteful 10MB drain loops when responses lack `Content-Length` headers, switching to immediate truncation marking and graceful size indication.
+- **Removed Deprecated Legacy Config Reader:** Eliminated legacy `SpringBootConfigReader` fallbacks in endpoint scanners and UI to prevent non-deterministic base URL and port calculations.
+
+### Fixed
+- **Async Race Conditions & Stale State Overwrites:** Bound asynchronous responses strictly to originating request executions (`RequestExecutionContext`), dropping superseded/canceled responses and eliminating duplicate history entries.
+- **Data Loss Prevention on Empty Scans:** Added guards to `pruneOrphanScannedEndpoints` and scan handlers to avoid clearing persisted state and credentials during background indexing or empty scan cycles.
+- **Context-Path Retention on Reload:** Fixed context-path loss during project reload by invalidating resolution caches and applying relaxed property bindings.
+- **Corrupted URL Sanitization:** Upgraded URL building to use RFC 3986 `HttpUrl.resolve` and preserved nested URLs inside query parameters (e.g. proxy endpoints).
+- **False-Positive Binary Response Detection:** Refined binary payload detection to prevent UTF-8 and textual MIME responses with multibyte characters from being incorrectly treated as binary.
+- **Safe Truncated File Saving:** Warn users before saving truncated response bodies to disk and cleanly stripped internal UI truncation banners.
+- **Deferred Credential Migration:** Postponed PasswordSafe credential migration until the IntelliJ `Project` instance is fully attached, preventing secret loss during early state deserialization.
+
+### Security
+- **Strict Host-Level TLS Consent:** Enforced explicit user consent dialogs for self-signed certificates restricted to local development hosts (`localhost`, `127.0.0.1`, `::1`), and removed deprecated boolean bypass methods.
+- **IntelliJ PasswordSafe Secret Storage:** Migrated sensitive tokens, passwords, and API keys out of plaintext XML workspace files into IntelliJ's secure `CredentialStore`.
+- **Automatic Request & Response Redaction:** Sanitized sensitive fields (passwords, tokens, secrets) in persisted request bodies and response headers/bodies before storing state to disk.
+
 ## [1.1.1] - 2026-09-01
 
 ### Fixed
@@ -34,4 +63,3 @@
 - **Postman-Style Native UI:** Soft word wrapping, colorful HTTP method badges, response formatting, and cURL export.
 - **Trust-All SSL for Dev:** Seamless local HTTPS testing without `SSLHandshakeException` errors.
 - **State Persistence:** Automatically preserves parameter inputs and testing history across IDE restarts.
-

@@ -4,7 +4,7 @@
 ### Spring Boot RESTful API Tester for IntelliJ IDEA
 
 [![Build](https://github.com/ThanhMiLa/SpringLens/actions/workflows/build.yml/badge.svg)](https://github.com/ThanhMiLa/SpringLens/actions)
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/ThanhMiLa/SpringLens/releases)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](https://github.com/ThanhMiLa/SpringLens/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](./LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.x%20%7C%203.x-6DB33F.svg)](https://spring.io/projects/spring-boot)
@@ -59,7 +59,7 @@ SpringLens automatically scans your project to organize all endpoints into an in
 3. Click **Install** and restart the IDE.
 
 ### Option B: Install from Disk (.zip)
-1. Download `SpringLens-1.1.1.zip` from [GitHub Releases](https://github.com/ThanhMiLa/SpringLens/releases).
+1. Download `SpringLens-1.1.2.zip` from [GitHub Releases](https://github.com/ThanhMiLa/SpringLens/releases).
 2. Go to **Settings** > **Plugins** > click the Settings icon > **Install Plugin from Disk...**.
 3. Select the downloaded `.zip` file and restart IntelliJ IDEA.
 
@@ -69,7 +69,7 @@ git clone https://github.com/ThanhMiLa/SpringLens.git
 cd SpringLens
 ./gradlew buildPlugin
 ```
-The packaged plugin will be available at `build/distributions/SpringLens-1.1.1.zip`.
+The packaged plugin will be available at `build/distributions/SpringLens-1.1.2.zip`.
 
 
 ## TLS Security
