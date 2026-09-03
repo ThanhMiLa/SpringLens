@@ -93,20 +93,6 @@ public class SpringConfigResolutionService implements Disposable {
         SpringServerConfig cached = serverConfigCache.get(cacheKey);
         if (cached != null) return cached;
 
-        com.intellij.openapi.application.Application app = ApplicationManager.getApplication();
-        if (app != null && app.isDispatchThread()) {
-            SpringServerConfig fallback = new SpringServerConfig();
-            fallback.setFallback(true);
-            serverConfigCache.put(cacheKey, fallback);
-            app.executeOnPooledThread(() -> {
-                try {
-                    SpringServerConfig resolved = readServerConfigInternal(module);
-                    serverConfigCache.put(cacheKey, resolved);
-                } catch (Throwable ignored) {}
-            });
-            return fallback;
-        }
-
         SpringServerConfig config = readServerConfigInternal(module);
         serverConfigCache.put(cacheKey, config);
         return config;
@@ -116,20 +102,6 @@ public class SpringConfigResolutionService implements Disposable {
         String cacheKey = "__project__";
         GatewayConfig cached = gatewayConfigCache.get(cacheKey);
         if (cached != null) return cached;
-
-        com.intellij.openapi.application.Application app = ApplicationManager.getApplication();
-        if (app != null && app.isDispatchThread()) {
-            GatewayConfig fallback = new GatewayConfig();
-            fallback.isFallback = true;
-            gatewayConfigCache.put(cacheKey, fallback);
-            app.executeOnPooledThread(() -> {
-                try {
-                    GatewayConfig resolved = readGatewayConfigInternal();
-                    gatewayConfigCache.put(cacheKey, resolved);
-                } catch (Throwable ignored) {}
-            });
-            return fallback;
-        }
 
         GatewayConfig config = readGatewayConfigInternal();
         gatewayConfigCache.put(cacheKey, config);
@@ -214,9 +186,17 @@ public class SpringConfigResolutionService implements Disposable {
         }
 
         // Resolve context-path
-        String contextPath = accumulatedProps.get("server.servlet.context-path");
-        if (contextPath == null) contextPath = accumulatedProps.get("server.context-path");
-        if (contextPath == null) contextPath = accumulatedProps.get("spring.webflux.base-path");
+        String contextPath = findContextPathInProps(accumulatedProps);
+        if (contextPath == null || contextPath.isBlank()) {
+            for (VirtualFile vf : candidateFiles) {
+                Map<String, String> extraProps = loadPropertiesFromFile(vf);
+                String extra = findContextPathInProps(extraProps);
+                if (extra != null && !extra.isBlank()) {
+                    contextPath = extra;
+                    break;
+                }
+            }
+        }
         if (contextPath != null && !contextPath.isBlank()) {
             String resolvedPath = resolvePlaceholders(contextPath, accumulatedProps, config.getDiagnostics());
             config.setContextPath(resolvedPath.trim());
@@ -489,6 +469,10 @@ public class SpringConfigResolutionService implements Disposable {
             }
         }
 
+        if (result.isEmpty() && module != null) {
+            return findAndSortConfigFiles(null);
+        }
+
         // Deterministic sort: bootstrap base -> bootstrap profile -> application base -> application profile, path
         result.sort((f1, f2) -> {
             int p1 = getFilePrecedence(f1.getName());
@@ -637,6 +621,28 @@ public class SpringConfigResolutionService implements Disposable {
             }
         }
         return true;
+    }
+
+    public static String findContextPathInProps(Map<String, String> props) {
+        if (props == null) return null;
+        String[] keys = {
+            "server.servlet.context-path",
+            "server.servlet.contextPath",
+            "server.servlet.context_path",
+            "server.context-path",
+            "server.contextPath",
+            "server.context_path",
+            "spring.webflux.base-path",
+            "spring.webflux.basePath",
+            "spring.webflux.base_path"
+        };
+        for (String k : keys) {
+            String val = props.get(k);
+            if (val != null && !val.isBlank()) {
+                return val.trim();
+            }
+        }
+        return null;
     }
 
     public static boolean matchesProfile(String profileSpec, String activeProfile) {

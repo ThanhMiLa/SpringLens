@@ -180,6 +180,37 @@ public class SpringConfigResolutionServiceTest {
         Assert.assertEquals("order-service", config.getAppName());
     }
 
+    @Test
+    public void testFindContextPathInProps() {
+        Map<String, String> propsKebab = Map.of("server.servlet.context-path", "/api/kebab");
+        Assert.assertEquals("/api/kebab", SpringConfigResolutionService.findContextPathInProps(propsKebab));
+
+        Map<String, String> propsCamel = Map.of("server.servlet.contextPath", "/api/camel");
+        Assert.assertEquals("/api/camel", SpringConfigResolutionService.findContextPathInProps(propsCamel));
+
+        Map<String, String> propsSnake = Map.of("server.servlet.context_path", "/api/snake");
+        Assert.assertEquals("/api/snake", SpringConfigResolutionService.findContextPathInProps(propsSnake));
+
+        Map<String, String> propsLegacy = Map.of("server.context-path", "/api/legacy");
+        Assert.assertEquals("/api/legacy", SpringConfigResolutionService.findContextPathInProps(propsLegacy));
+
+        Map<String, String> propsWebflux = Map.of("spring.webflux.base-path", "/webflux");
+        Assert.assertEquals("/webflux", SpringConfigResolutionService.findContextPathInProps(propsWebflux));
+
+        Assert.assertNull(SpringConfigResolutionService.findContextPathInProps(java.util.Collections.emptyMap()));
+        Assert.assertNull(SpringConfigResolutionService.findContextPathInProps(null));
+    }
+
+    @Test
+    public void testHasContextPathHelper() {
+        Assert.assertTrue(SpringEndpointScanner.hasContextPath("http://localhost:8080/api"));
+        Assert.assertTrue(SpringEndpointScanner.hasContextPath("https://localhost:8443/api/v1"));
+        Assert.assertFalse(SpringEndpointScanner.hasContextPath("http://localhost:8080"));
+        Assert.assertFalse(SpringEndpointScanner.hasContextPath("http://localhost:8080/"));
+        Assert.assertFalse(SpringEndpointScanner.hasContextPath(null));
+        Assert.assertFalse(SpringEndpointScanner.hasContextPath(""));
+    }
+
     // Lightweight MockVirtualFile for testing path exclusion
     private static class MockVirtualFile extends com.intellij.mock.MockVirtualFile {
         private final String fullPath;
