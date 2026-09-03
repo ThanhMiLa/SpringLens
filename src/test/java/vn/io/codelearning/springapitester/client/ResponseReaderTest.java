@@ -73,6 +73,24 @@ public class ResponseReaderTest {
     }
 
     @Test
+    public void testVietnameseAndUtf8JsonIsNotClassifiedAsBinary() throws IOException {
+        String vietnameseJson = "{\"courses\":[{\"id\":1,\"title\":\"Khóa học Lập trình Spring Boot nâng cao\"," +
+                "\"description\":\"Học viên sẽ nắm vững kiến thức kiến trúc microservices và thực hành dự án thực tế.\"," +
+                "\"instructor\":\"Nguyễn Văn A\",\"price\":\"1.200.000đ\"}]}";
+
+        ResponseBody body = ResponseBody.create(MediaType.parse("application/json;charset=UTF-8"), vietnameseJson);
+        ResponseReader.ReadResult result = ResponseReader.readBody(body, "application/json;charset=UTF-8", 1024 * 1024);
+
+        Assert.assertFalse(result.isBinary());
+        Assert.assertFalse(result.isTruncated());
+        Assert.assertEquals(vietnameseJson, result.getText());
+
+        // Also verify with raw isBinaryData on byte sample
+        byte[] bytes = vietnameseJson.getBytes(StandardCharsets.UTF_8);
+        Assert.assertFalse(ResponseReader.isBinaryData(bytes, bytes.length));
+    }
+
+    @Test
     public void testUtf8BoundarySafety() {
         // 4-byte UTF-8 emoji: 🚀 is 0xF0, 0x9F, 0x9A, 0x80
         byte[] emoji = "Hello 🚀 World".getBytes(StandardCharsets.UTF_8);

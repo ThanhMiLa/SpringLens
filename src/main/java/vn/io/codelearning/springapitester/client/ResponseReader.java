@@ -52,20 +52,45 @@ public final class ResponseReader {
                 || ct.contains("binary");
     }
 
+    public static boolean isTextualContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) return false;
+        String ct = contentType.toLowerCase(Locale.ROOT);
+        return ct.contains("json")
+                || ct.contains("xml")
+                || ct.contains("text")
+                || ct.contains("html")
+                || ct.contains("javascript")
+                || ct.contains("css")
+                || ct.contains("csv")
+                || ct.contains("yaml")
+                || ct.contains("yml");
+    }
+
     public static boolean isBinaryData(byte[] sample, int length) {
         if (sample == null || length <= 0) return false;
         int checkLen = Math.min(length, 1024);
         int nonPrintable = 0;
         for (int i = 0; i < checkLen; i++) {
-            byte b = sample[i];
-            if (b == 0) {
+            int val = sample[i] & 0xFF;
+            if (val == 0) {
                 return true;
             }
-            if ((b < 0x20 && b != 0x09 && b != 0x0A && b != 0x0D) || b == 0x7F) {
+            // Control characters in ASCII: 0x00-0x1F (except TAB 0x09, LF 0x0A, CR 0x0D), and DEL is 0x7F
+            // Note: Bytes 0x80-0xFF are UTF-8 multi-byte sequences (Vietnamese accents, CJK, emojis, etc.)
+            if ((val < 0x20 && val != 0x09 && val != 0x0A && val != 0x0D) || val == 0x7F) {
                 nonPrintable++;
             }
         }
         return nonPrintable > (checkLen * 0.1);
+    }
+
+    private static boolean containsNullByte(byte[] sample, int length) {
+        if (sample == null || length <= 0) return false;
+        int checkLen = Math.min(length, 1024);
+        for (int i = 0; i < checkLen; i++) {
+            if (sample[i] == 0) return true;
+        }
+        return false;
     }
 
     public static int findSafeUtf8Boundary(byte[] data, int length) {
@@ -149,7 +174,15 @@ public final class ResponseReader {
             }
         }
 
-        boolean isBinary = isDeclaredBinary || isBinaryData(previewBytes, previewBytes.length);
+        boolean isDeclaredText = isTextualContentType(contentType);
+        boolean isBinary;
+        if (isDeclaredBinary) {
+            isBinary = true;
+        } else if (isDeclaredText) {
+            isBinary = containsNullByte(previewBytes, previewBytes.length);
+        } else {
+            isBinary = isBinaryData(previewBytes, previewBytes.length);
+        }
         if (isBinary) {
             String mime = (contentType != null && !contentType.isBlank()) ? contentType : "application/octet-stream";
             String note = "[Binary data: " + mime + ", " + formatByteSize(totalBytes) + "]";
