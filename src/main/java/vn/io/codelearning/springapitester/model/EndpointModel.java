@@ -19,6 +19,7 @@ public class EndpointModel {
     private String controllerName;
     private String packageName;
     private String methodName;
+    private String methodSignature = "";
     private boolean isSecured;
     private boolean isRestEndpoint;  // true = trả về JSON/data, false = trả về View (Thymeleaf, JSP)
     private List<ParameterModel> parameters;
@@ -117,6 +118,14 @@ public class EndpointModel {
 
     public void setMethodName(String methodName) {
         this.methodName = methodName;
+    }
+
+    public String getMethodSignature() {
+        return methodSignature != null ? methodSignature : "";
+    }
+
+    public void setMethodSignature(String methodSignature) {
+        this.methodSignature = methodSignature != null ? methodSignature : "";
     }
 
     public boolean isSecured() {

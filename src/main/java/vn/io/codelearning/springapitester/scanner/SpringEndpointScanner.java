@@ -99,6 +99,7 @@ public class SpringEndpointScanner {
                 for (EndpointModel ep : methodEndpoints) {
                     ep.setModuleName(moduleName);
                     ep.setDirectBaseUrl(directBaseUrl);
+                    ep.setMethodSignature(signature);
                 }
                 result.addAll(methodEndpoints);
             }

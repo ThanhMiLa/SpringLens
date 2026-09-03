@@ -402,7 +402,12 @@ public class EndpointTreePanel extends JPanel {
             deleteItem.addActionListener(ev -> {
                 if (state != null) {
                     state.manualFolders.removeIf(f -> f.getId().equals(folder.getId()));
-                    state.manualEndpoints.removeIf(ep -> folder.getId().equals(ep.folderId));
+                    java.util.List<vn.io.codelearning.springapitester.state.EndpointSavedState> toRemove = state.manualEndpoints.stream()
+                            .filter(ep -> folder.getId().equals(ep.folderId))
+                            .toList();
+                    for (vn.io.codelearning.springapitester.state.EndpointSavedState ep : toRemove) {
+                        state.deleteManualEndpoint(ep.id);
+                    }
                     updateEndpoints(this.currentEndpoints);
                 }
             });
@@ -486,7 +491,7 @@ public class EndpointTreePanel extends JPanel {
                 javax.swing.JMenuItem deleteItem = new javax.swing.JMenuItem("Delete Request");
                 deleteItem.addActionListener(ev -> {
                     if (state != null) {
-                        state.manualEndpoints.removeIf(ep -> ep.id.equals(endpoint.getId()));
+                        state.deleteManualEndpoint(endpoint.getId());
                         updateEndpoints(this.currentEndpoints);
                     }
                 });

@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import vn.io.codelearning.springapitester.model.AuthConfig;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import java.util.UUID;
 )
 public class SpringLensState implements PersistentStateComponent<SpringLensState> {
 
+    public int schemaVersion = 1;
     public Map<String, EndpointSavedState> endpoints = new HashMap<>();
     
     // Module 7: Manual structures
@@ -44,6 +46,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
 
     @Override
     public void loadState(@NotNull SpringLensState state) {
+        this.schemaVersion = state.schemaVersion;
         this.endpoints = state.endpoints != null ? state.endpoints : new HashMap<>();
         if (state.manualFolders != null) {
             this.manualFolders = state.manualFolders;
@@ -58,7 +61,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     }
 
     public String getEndpointKey(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
-        return endpoint.getHttpMethod().name() + " " + endpoint.getPath();
+        return vn.io.codelearning.springapitester.model.EndpointIdentity.createKey(endpoint);
     }
 
     public void saveEndpoint(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
@@ -92,6 +95,8 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             saved.hasSecuredOverride = false;
         }
 
+        saved.paramValues.clear();
+        saved.paramEnabled.clear();
         for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() != null && param.getName() != null) {
                 String typeKey = param.getParamType().name() + ":" + param.getName();
@@ -102,6 +107,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             }
         }
         
+        String key = getEndpointKey(endpoint);
         if (endpoint.isManual()) {
             saved.id = endpoint.getId();
             saved.name = endpoint.getName();
@@ -124,13 +130,73 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             // Update or add
             manualEndpoints.removeIf(e -> e.id != null && e.id.equals(saved.id));
             manualEndpoints.add(saved);
+            endpoints.put(key, saved);
         } else {
-            endpoints.put(getEndpointKey(endpoint), saved);
+            endpoints.put(key, saved);
         }
+    }
+
+    public void deleteManualEndpoint(String manualId) {
+        if (manualId == null || manualId.isBlank()) return;
+        EndpointSavedState removed = manualEndpoints.stream()
+                .filter(e -> manualId.equals(e.id))
+                .findFirst().orElse(null);
+        if (removed != null) {
+            manualEndpoints.remove(removed);
+            if (removed.credentialId != null) {
+                CredentialStore store = credentialStore();
+                if (store != null) {
+                    store.delete(removed.credentialId);
+                }
+            }
+        }
+        endpoints.remove("manual:" + manualId);
+    }
+
+    public void migrateLegacyKeys(List<vn.io.codelearning.springapitester.model.EndpointModel> discoveredEndpoints) {
+        if (discoveredEndpoints == null || discoveredEndpoints.isEmpty()) {
+            this.schemaVersion = 2;
+            return;
+        }
+
+        Map<String, List<vn.io.codelearning.springapitester.model.EndpointModel>> grouped = new HashMap<>();
+        for (vn.io.codelearning.springapitester.model.EndpointModel ep : discoveredEndpoints) {
+            if (ep.isManual()) continue;
+            String legacyKey = ep.getHttpMethod().name() + " " + ep.getPath();
+            grouped.computeIfAbsent(legacyKey, k -> new ArrayList<>()).add(ep);
+        }
+
+        List<String> currentKeys = new ArrayList<>(endpoints.keySet());
+        for (String key : currentKeys) {
+            if (key.startsWith("manual:") || key.contains("#")) {
+                continue;
+            }
+            List<vn.io.codelearning.springapitester.model.EndpointModel> matches = grouped.get(key);
+            if (matches != null && matches.size() == 1) {
+                vn.io.codelearning.springapitester.model.EndpointModel target = matches.get(0);
+                String newKey = getEndpointKey(target);
+                EndpointSavedState saved = endpoints.remove(key);
+                if (!endpoints.containsKey(newKey)) {
+                    endpoints.put(newKey, saved);
+                }
+            } else {
+                endpoints.remove(key);
+            }
+        }
+        this.schemaVersion = 2;
     }
 
     public void restoreEndpoint(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
         EndpointSavedState saved = endpoints.get(getEndpointKey(endpoint));
+        if (saved == null && endpoint.isManual()) {
+            saved = manualEndpoints.stream()
+                    .filter(e -> e.id != null && e.id.equals(endpoint.getId()))
+                    .findFirst().orElse(null);
+        }
+        if (saved == null && schemaVersion < 2) {
+            String legacyKey = endpoint.getHttpMethod().name() + " " + endpoint.getPath();
+            saved = endpoints.get(legacyKey);
+        }
         if (saved == null) return;
 
         // Restore Auth & Headers

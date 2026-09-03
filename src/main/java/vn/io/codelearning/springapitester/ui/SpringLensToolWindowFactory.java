@@ -45,6 +45,7 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                         // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
                         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
                         if (state != null) {
+                            state.migrateLegacyKeys(scannedEndpoints);
                             for (EndpointModel ep : scannedEndpoints) {
                                 state.restoreEndpoint(ep);
                             }
