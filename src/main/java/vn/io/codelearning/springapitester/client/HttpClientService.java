@@ -32,13 +32,17 @@ public class HttpClientService {
         this.cookieJar = new InMemoryCookieJar();
         
         this.secureClient = new OkHttpClient.Builder()
-                .cookieJar(cookieJar)
+                .addInterceptor(new CookieInterceptor(cookieJar))
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .build();
         this.gson = new GsonBuilder().setPrettyPrinting().create();
+    }
+
+    public InMemoryCookieJar getCookieJar() {
+        return cookieJar;
     }
 
     private static X509TrustManager createUnsafeTrustManager() {

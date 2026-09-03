@@ -23,7 +23,10 @@ public class CurlBuilder {
         String urlPath = fullUrlPattern;
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
-                String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required path variable: " + param.getName());
+                }
                 urlPath = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
             }
         }
@@ -31,8 +34,11 @@ public class CurlBuilder {
         StringBuilder queryParams = new StringBuilder();
         boolean firstQuery = true;
         for (ParameterModel param : endpoint.getParameters()) {
-            if (param.getParamType() == ParamTypeEnum.QUERY_PARAM) {
-                String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
+            if (param.getParamType() == ParamTypeEnum.QUERY_PARAM && param.isEnabled()) {
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required query parameter: " + param.getName());
+                }
                 if (!value.trim().isEmpty()) {
                     queryParams.append(firstQuery ? "?" : "&")
                             .append(param.getName()).append("=").append(value);
@@ -56,12 +62,50 @@ public class CurlBuilder {
         curl.append(" \"").append(urlPath).append(queryParams).append("\"");
 
         // Headers
+        java.util.Map<String, String> cookieParams = new java.util.LinkedHashMap<>();
+
         if (endpoint.getCustomHeaders() != null) {
             for (HeaderItem header : endpoint.getCustomHeaders()) {
                 if (header.isEnabled() && header.getKey() != null && !header.getKey().isBlank()) {
-                    curl.append(" \\\n  -H \"").append(header.getKey()).append(": ").append(header.getValue() != null ? header.getValue() : "").append("\"");
+                    RequestValidationUtil.validateHeader(header.getKey(), header.getValue());
+                    String val = header.getValue() != null ? header.getValue() : "";
+                    if ("Cookie".equalsIgnoreCase(header.getKey())) {
+                        cookieParams.putAll(RequestValidationUtil.parseCookieHeader(val));
+                    } else {
+                        curl.append(" \\\n  -H \"").append(header.getKey()).append(": ").append(val).append("\"");
+                    }
                 }
             }
+        }
+
+        for (ParameterModel param : endpoint.getParameters()) {
+            if (param.getParamType() == ParamTypeEnum.HEADER && param.isEnabled()) {
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required header: " + param.getName());
+                }
+                if (!value.trim().isEmpty()) {
+                    RequestValidationUtil.validateHeader(param.getName(), value);
+                    curl.append(" \\\n  -H \"").append(param.getName()).append(": ").append(value).append("\"");
+                }
+            }
+        }
+
+        for (ParameterModel param : endpoint.getParameters()) {
+            if (param.getParamType() == ParamTypeEnum.COOKIE && param.isEnabled()) {
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required cookie: " + param.getName());
+                }
+                if (!value.trim().isEmpty()) {
+                    RequestValidationUtil.validateCookie(param.getName(), value);
+                    cookieParams.put(param.getName(), value);
+                }
+            }
+        }
+
+        if (!cookieParams.isEmpty()) {
+            curl.append(" \\\n  -H \"Cookie: ").append(RequestValidationUtil.formatCookieHeader(cookieParams)).append("\"");
         }
 
         // Auth Headers

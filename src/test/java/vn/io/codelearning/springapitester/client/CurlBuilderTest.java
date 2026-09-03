@@ -129,4 +129,62 @@ public class CurlBuilderTest {
         Assert.assertTrue(curl.contains("-F \"username=JohnDoe\""));
         Assert.assertTrue(curl.contains("-F \"avatar=@/path/to/avatar.png\""));
     }
+
+    @Test
+    public void testCurlWithHeaderAndCookieParameters() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/profile", "ProfileController", "com.example", "getProfile");
+        ParameterModel header = new ParameterModel("X-Request-Id", ParamTypeEnum.HEADER, "String");
+        header.setCurrentValue("req-123");
+        ParameterModel headerDef = new ParameterModel("X-Platform", ParamTypeEnum.HEADER, "String", "web", false, "", "");
+
+        ParameterModel cookie = new ParameterModel("sessionId", ParamTypeEnum.COOKIE, "String");
+        cookie.setCurrentValue("sess-abc");
+        ParameterModel cookieDef = new ParameterModel("theme", ParamTypeEnum.COOKIE, "String", "dark", false, "", "");
+
+        endpoint.addParameter(header);
+        endpoint.addParameter(headerDef);
+        endpoint.addParameter(cookie);
+        endpoint.addParameter(cookieDef);
+
+        String curl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/profile");
+        Assert.assertTrue(curl.contains("-H \"X-Request-Id: req-123\""));
+        Assert.assertTrue(curl.contains("-H \"X-Platform: web\""));
+        Assert.assertTrue(curl.contains("-H \"Cookie: sessionId=sess-abc; theme=dark\""));
+
+        // Verify equivalence with OkHttp request
+        okhttp3.Request okHttpRequest = HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/profile");
+        Assert.assertEquals("req-123", okHttpRequest.header("X-Request-Id"));
+        Assert.assertEquals("web", okHttpRequest.header("X-Platform"));
+        Assert.assertEquals("sessionId=sess-abc; theme=dark", okHttpRequest.header("Cookie"));
+    }
+
+    @Test
+    public void testCurlCookiePrecedenceOverCustomHeader() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        endpoint.addCustomHeader(new HeaderItem("Cookie", "session=old-session; extra=foo", true));
+        ParameterModel cookieParam = new ParameterModel("session", ParamTypeEnum.COOKIE, "String");
+        cookieParam.setCurrentValue("new-session");
+        endpoint.addParameter(cookieParam);
+
+        String curl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api");
+        Assert.assertTrue(curl.contains("-H \"Cookie: session=new-session; extra=foo\""));
+        Assert.assertFalse(curl.contains("session=old-session"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCurlRequiredHeaderValidation() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        ParameterModel header = new ParameterModel("X-Required", ParamTypeEnum.HEADER, "String", "", true, "", "");
+        endpoint.addParameter(header);
+        CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCurlHeaderInjectionRejected() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        ParameterModel header = new ParameterModel("X-Header\r\nInjected: true", ParamTypeEnum.HEADER, "String");
+        header.setCurrentValue("val");
+        endpoint.addParameter(header);
+        CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api");
+    }
 }

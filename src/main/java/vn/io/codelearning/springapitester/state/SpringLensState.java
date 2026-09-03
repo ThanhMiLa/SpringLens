@@ -93,8 +93,12 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         }
 
         for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
-            if (param.getCurrentValue() != null) {
-                saved.paramValues.put(param.getName(), param.getCurrentValue());
+            if (param.getParamType() != null && param.getName() != null) {
+                String typeKey = param.getParamType().name() + ":" + param.getName();
+                if (param.getCurrentValue() != null) {
+                    saved.paramValues.put(typeKey, param.getCurrentValue());
+                }
+                saved.paramEnabled.put(typeKey, param.isEnabled());
             }
         }
         
@@ -114,6 +118,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
                 clone.setCurrentValue(param.getCurrentValue());
                 clone.setRequired(param.isRequired());
                 clone.setDefaultValue(param.getDefaultValue());
+                clone.setEnabled(param.isEnabled());
                 saved.manualParameters.add(clone);
             }
             // Update or add
@@ -146,8 +151,16 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
 
         // Smart Merge Parameters
         for (vn.io.codelearning.springapitester.model.ParameterModel param : endpoint.getParameters()) {
-            if (saved.paramValues.containsKey(param.getName())) {
-                param.setCurrentValue(saved.paramValues.get(param.getName()));
+            if (param.getParamType() != null && param.getName() != null) {
+                String typeKey = param.getParamType().name() + ":" + param.getName();
+                if (saved.paramValues.containsKey(typeKey)) {
+                    param.setCurrentValue(saved.paramValues.get(typeKey));
+                } else if (saved.paramValues.containsKey(param.getName())) {
+                    param.setCurrentValue(saved.paramValues.get(param.getName()));
+                }
+                if (saved.paramEnabled != null && saved.paramEnabled.containsKey(typeKey)) {
+                    param.setEnabled(saved.paramEnabled.get(typeKey));
+                }
             }
         }
 

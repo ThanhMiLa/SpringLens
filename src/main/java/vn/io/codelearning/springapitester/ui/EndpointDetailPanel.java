@@ -35,6 +35,8 @@ public class EndpointDetailPanel extends JPanel {
     private final JCheckBox persistResponseHistoryCheckBox;
 
     private final ParamTablePanel paramPanel;
+    private final ParamTablePanel headerParamPanel;
+    private final ParamTablePanel cookiePanel;
     private ParamTablePanel formDataPanel;
     private final HeaderTablePanel headerPanel;
     private final AuthPanel authPanel;
@@ -295,6 +297,12 @@ public class EndpointDetailPanel extends JPanel {
             vn.io.codelearning.springapitester.model.ParamTypeEnum.PATH_VARIABLE,
             vn.io.codelearning.springapitester.model.ParamTypeEnum.QUERY_PARAM
         ));
+        headerParamPanel = new ParamTablePanel(java.util.List.of(
+            vn.io.codelearning.springapitester.model.ParamTypeEnum.HEADER
+        ));
+        cookiePanel = new ParamTablePanel(java.util.List.of(
+            vn.io.codelearning.springapitester.model.ParamTypeEnum.COOKIE
+        ));
         headerPanel = new HeaderTablePanel();
         authPanel = new AuthPanel();
         authPanel.setOnSecurityToggled(isSecured -> {
@@ -374,8 +382,30 @@ public class EndpointDetailPanel extends JPanel {
         this.bodyCards = bodyCards;
         this.syncBtn = syncBtn;
 
+        JPanel headersTabPanel = new JPanel(new BorderLayout());
+        JBSplitter headersSplitter = new JBSplitter(true, 0.5f);
+        headersSplitter.setShowDividerControls(true);
+        headersSplitter.setDividerWidth(5);
+
+        JPanel headerParamWrapper = new JPanel(new BorderLayout());
+        headerParamWrapper.setBorder(BorderFactory.createTitledBorder("Request Headers (@RequestHeader)"));
+        headerParamWrapper.add(headerParamPanel, BorderLayout.CENTER);
+
+        JPanel customHeadersWrapper = new JPanel(new BorderLayout());
+        customHeadersWrapper.setBorder(BorderFactory.createTitledBorder("Custom Headers"));
+        customHeadersWrapper.add(headerPanel, BorderLayout.CENTER);
+
+        headersSplitter.setFirstComponent(headerParamWrapper);
+        headersSplitter.setSecondComponent(customHeadersWrapper);
+        headersTabPanel.add(headersSplitter, BorderLayout.CENTER);
+
+        JPanel cookiesTabPanel = new JPanel(new BorderLayout());
+        cookiesTabPanel.setBorder(BorderFactory.createTitledBorder("Cookie Values (@CookieValue)"));
+        cookiesTabPanel.add(cookiePanel, BorderLayout.CENTER);
+
         requestTabs.addTab("Params", paramPanel);
-        requestTabs.addTab("Headers", headerPanel);
+        requestTabs.addTab("Headers", headersTabPanel);
+        requestTabs.addTab("Cookies", cookiesTabPanel);
         requestTabs.addTab("Auth", authPanel);
         requestTabs.addTab("Body", requestBodyPanel);
         
@@ -484,6 +514,8 @@ public class EndpointDetailPanel extends JPanel {
                 methodComboBox.setSelectedItem(vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
                 urlField.setText("");
                 paramPanel.setParameters(new java.util.ArrayList<>());
+                headerParamPanel.setParameters(new java.util.ArrayList<>());
+                cookiePanel.setParameters(new java.util.ArrayList<>());
                 formDataPanel.setParameters(new java.util.ArrayList<>());
                 headerPanel.setHeaders(new java.util.ArrayList<>());
                 authPanel.setAuthConfig(new vn.io.codelearning.springapitester.model.AuthConfig());
@@ -513,6 +545,8 @@ public class EndpointDetailPanel extends JPanel {
             urlField.setText(fullUrl.replace("//", "/").replace("http:/l", "http://l").replace("https:/l", "https://l"));
 
             paramPanel.setParameters(endpoint.getParameters());
+            headerParamPanel.setParameters(endpoint.getParameters());
+            cookiePanel.setParameters(endpoint.getParameters());
             formDataPanel.setParameters(endpoint.getParameters());
             headerPanel.setHeaders(endpoint.getCustomHeaders());
             authPanel.setAuthConfig(endpoint.getAuthConfig());
@@ -581,9 +615,21 @@ public class EndpointDetailPanel extends JPanel {
 
     private void collectDataToModel() {
         if (currentEndpoint == null) return;
-        // We don't overwrite currentEndpoint.setParameters() because the table models mutate the Param objects directly.
-        // If we do, we will lose internal framework params and form data params.
-        // We just leave endpoint.getParameters() intact.
+        // Collect all parameters across panels while preserving unmanaged parameters
+        java.util.List<ParameterModel> allParams = new java.util.ArrayList<>();
+        if (currentEndpoint.getParameters() != null) {
+            for (ParameterModel p : currentEndpoint.getParameters()) {
+                if (p.getParamType() == ParamTypeEnum.FRAMEWORK_INTERNAL || p.getParamType() == ParamTypeEnum.REQUEST_BODY) {
+                    allParams.add(p);
+                }
+            }
+        }
+        allParams.addAll(paramPanel.getParameters());
+        allParams.addAll(headerParamPanel.getParameters());
+        allParams.addAll(cookiePanel.getParameters());
+        allParams.addAll(formDataPanel.getParameters());
+        currentEndpoint.setParameters(allParams);
+
         vn.io.codelearning.springapitester.model.HttpMethodEnum method = (vn.io.codelearning.springapitester.model.HttpMethodEnum) methodComboBox.getSelectedItem();
         if (method != null) {
             currentEndpoint.setHttpMethod(method);

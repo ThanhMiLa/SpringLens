@@ -21,7 +21,10 @@ public class HttpRequestBuilder {
         // 1. Thay thế Path Variables (hỗ trợ cả pattern regex)
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
-                String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required path variable: " + param.getName());
+                }
                 urlPath = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
             }
         }
@@ -34,9 +37,12 @@ public class HttpRequestBuilder {
 
         // 2. Gắn Query Params (?key=value)
         for (ParameterModel param : endpoint.getParameters()) {
-            if (param.getParamType() == ParamTypeEnum.QUERY_PARAM) {
-                String value = param.getCurrentValue() != null ? param.getCurrentValue() : "";
-                // Không gửi param nếu value rỗng để tránh Spring Boot báo lỗi ép kiểu (vd Enum, Integer)
+            if (param.getParamType() == ParamTypeEnum.QUERY_PARAM && param.isEnabled()) {
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required query parameter: " + param.getName());
+                }
+                // Không gửi param nếu value rỗng để tránh Spring Boot báo lỗi ép kiểu
                 if (!value.trim().isEmpty()) {
                     urlBuilder.addQueryParameter(param.getName(), value);
                 }
@@ -81,15 +87,51 @@ public class HttpRequestBuilder {
 
         requestBuilder.url(urlBuilder.build());
 
-        // 4. Gắn Custom Headers
+        // 4. Gắn Custom Headers, Header Parameters và Cookie Parameters
+        java.util.Map<String, String> cookieParams = new java.util.LinkedHashMap<>();
+
         if (endpoint.getCustomHeaders() != null) {
             for (HeaderItem header : endpoint.getCustomHeaders()) {
-                // Chỉ lấy những header nào đang được tick (isEnabled == true)
                 if (header.isEnabled() && header.getKey() != null && !header.getKey().isBlank()) {
+                    RequestValidationUtil.validateHeader(header.getKey(), header.getValue());
                     String val = header.getValue() != null ? header.getValue() : "";
-                    requestBuilder.addHeader(header.getKey(), val);
+                    if ("Cookie".equalsIgnoreCase(header.getKey())) {
+                        cookieParams.putAll(RequestValidationUtil.parseCookieHeader(val));
+                    } else {
+                        requestBuilder.addHeader(header.getKey(), val);
+                    }
                 }
             }
+        }
+
+        for (ParameterModel param : endpoint.getParameters()) {
+            if (param.getParamType() == ParamTypeEnum.HEADER && param.isEnabled()) {
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required header: " + param.getName());
+                }
+                if (!value.trim().isEmpty()) {
+                    RequestValidationUtil.validateHeader(param.getName(), value);
+                    requestBuilder.addHeader(param.getName(), value);
+                }
+            }
+        }
+
+        for (ParameterModel param : endpoint.getParameters()) {
+            if (param.getParamType() == ParamTypeEnum.COOKIE && param.isEnabled()) {
+                String value = RequestValidationUtil.resolveParamValue(param);
+                if (param.isRequired() && value.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Missing required cookie: " + param.getName());
+                }
+                if (!value.trim().isEmpty()) {
+                    RequestValidationUtil.validateCookie(param.getName(), value);
+                    cookieParams.put(param.getName(), value);
+                }
+            }
+        }
+
+        if (!cookieParams.isEmpty()) {
+            requestBuilder.header("Cookie", RequestValidationUtil.formatCookieHeader(cookieParams));
         }
 
         // 5. Gắn Body và HTTP Method

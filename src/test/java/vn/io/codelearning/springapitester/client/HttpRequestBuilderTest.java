@@ -132,4 +132,90 @@ public class HttpRequestBuilderTest {
         Assert.assertEquals("val1", request.header("X-Custom-1"));
         Assert.assertNull(request.header("X-Custom-2"));
     }
+
+    @Test
+    public void testBuildHeaderAndCookieParameters() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/profile", "ProfileController", "com.example", "getProfile");
+        ParameterModel header1 = new ParameterModel("X-Client-Id", ParamTypeEnum.HEADER, "String");
+        header1.setCurrentValue("client-123");
+        ParameterModel header2 = new ParameterModel("X-Platform", ParamTypeEnum.HEADER, "String", "web", false, "", "");
+        ParameterModel headerDisabled = new ParameterModel("X-Disabled", ParamTypeEnum.HEADER, "String");
+        headerDisabled.setCurrentValue("ignore");
+        headerDisabled.setEnabled(false);
+
+        ParameterModel cookie1 = new ParameterModel("sessionId", ParamTypeEnum.COOKIE, "String");
+        cookie1.setCurrentValue("sess-abc");
+        ParameterModel cookie2 = new ParameterModel("theme", ParamTypeEnum.COOKIE, "String", "dark", false, "", "");
+        ParameterModel cookieDisabled = new ParameterModel("trackId", ParamTypeEnum.COOKIE, "String");
+        cookieDisabled.setCurrentValue("track-xyz");
+        cookieDisabled.setEnabled(false);
+
+        endpoint.addParameter(header1);
+        endpoint.addParameter(header2);
+        endpoint.addParameter(headerDisabled);
+        endpoint.addParameter(cookie1);
+        endpoint.addParameter(cookie2);
+        endpoint.addParameter(cookieDisabled);
+
+        Request request = HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/profile");
+        Assert.assertEquals("client-123", request.header("X-Client-Id"));
+        Assert.assertEquals("web", request.header("X-Platform"));
+        Assert.assertNull(request.header("X-Disabled"));
+
+        String cookieHeader = request.header("Cookie");
+        Assert.assertNotNull(cookieHeader);
+        Assert.assertTrue(cookieHeader.contains("sessionId=sess-abc"));
+        Assert.assertTrue(cookieHeader.contains("theme=dark"));
+        Assert.assertFalse(cookieHeader.contains("trackId"));
+    }
+
+    @Test
+    public void testCookieParametersTakePrecedenceOverCustomCookieHeader() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        endpoint.addCustomHeader(new HeaderItem("Cookie", "session=old-session; extra=foo", true));
+        ParameterModel cookieParam = new ParameterModel("session", ParamTypeEnum.COOKIE, "String");
+        cookieParam.setCurrentValue("new-session");
+        endpoint.addParameter(cookieParam);
+
+        Request request = HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api");
+        String cookieHeader = request.header("Cookie");
+        Assert.assertNotNull(cookieHeader);
+        Assert.assertTrue(cookieHeader.contains("session=new-session"));
+        Assert.assertTrue(cookieHeader.contains("extra=foo"));
+        Assert.assertFalse(cookieHeader.contains("session=old-session"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testRequiredHeaderValidation() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        ParameterModel header = new ParameterModel("X-Required", ParamTypeEnum.HEADER, "String", "", true, "", "");
+        endpoint.addParameter(header);
+        HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testRequiredCookieValidation() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        ParameterModel cookie = new ParameterModel("authCookie", ParamTypeEnum.COOKIE, "String", "", true, "", "");
+        endpoint.addParameter(cookie);
+        HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testHeaderInjectionRejected() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        ParameterModel header = new ParameterModel("X-Bad\r\nInjected: true", ParamTypeEnum.HEADER, "String");
+        header.setCurrentValue("value");
+        endpoint.addParameter(header);
+        HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testCookieInjectionRejected() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api", "ApiController", "com.example", "api");
+        ParameterModel cookie = new ParameterModel("cookie", ParamTypeEnum.COOKIE, "String");
+        cookie.setCurrentValue("val\r\nInjected: true");
+        endpoint.addParameter(cookie);
+        HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api");
+    }
 }

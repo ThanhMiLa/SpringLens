@@ -281,7 +281,7 @@ public class SpringEndpointScanner {
                 required = explicitRequired;
             } else {
                 required = switch (paramType) {
-                    case PATH_VARIABLE, QUERY_PARAM, HEADER, REQUEST_BODY -> true;
+                    case PATH_VARIABLE, QUERY_PARAM, HEADER, COOKIE, REQUEST_BODY -> true;
                     default -> false;
                 };
             }

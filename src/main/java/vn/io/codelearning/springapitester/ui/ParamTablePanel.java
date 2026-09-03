@@ -18,23 +18,25 @@ public class ParamTablePanel extends JPanel {
         tableModel = new ParamTableModel(allowedTypes);
         table = new JBTable(tableModel);
         
-        // Cột 0: Tên tham số (chỉ đọc)
-        // Cột 1: Giá trị nhập vào (cho phép sửa)
-        // Cột 2: Loại (Path/Query - chỉ đọc)
-        
-        table.getColumnModel().getColumn(0).setPreferredWidth(150);
-        table.getColumnModel().getColumn(1).setPreferredWidth(250);
-        table.getColumnModel().getColumn(2).setPreferredWidth(100);
+        // Column 0: Checkbox (Enabled)
+        // Column 1: Param name
+        // Column 2: Value
+        // Column 3: Type
+        table.getColumnModel().getColumn(0).setMaxWidth(40);
+        table.getColumnModel().getColumn(0).setPreferredWidth(30);
+        table.getColumnModel().getColumn(1).setPreferredWidth(150);
+        table.getColumnModel().getColumn(2).setPreferredWidth(250);
+        table.getColumnModel().getColumn(3).setPreferredWidth(100);
         
         // ComboBox cho cột Type
         JComboBox<String> typeCombo = new JComboBox<>(new String[]{"Text", "File"});
-        table.getColumnModel().getColumn(2).setCellEditor(new DefaultCellEditor(typeCombo));
+        table.getColumnModel().getColumn(3).setCellEditor(new DefaultCellEditor(typeCombo));
 
         // Renderer cho cột Value
-        table.getColumnModel().getColumn(1).setCellRenderer(new javax.swing.table.DefaultTableCellRenderer() {
+        table.getColumnModel().getColumn(2).setCellRenderer(new javax.swing.table.DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                String typeStr = (String) table.getValueAt(row, 2);
+                String typeStr = (String) table.getValueAt(row, 3);
                 if ("File".equals(typeStr)) {
                     String text = (value != null && !value.toString().isBlank()) ? value.toString() : "Select files...";
                     return super.getTableCellRendererComponent(table, "📁 " + text, isSelected, hasFocus, row, column);
@@ -44,7 +46,7 @@ public class ParamTablePanel extends JPanel {
         });
 
         // Editor cho cột Value
-        table.getColumnModel().getColumn(1).setCellEditor(new DefaultCellEditor(new JTextField()) {
+        table.getColumnModel().getColumn(2).setCellEditor(new DefaultCellEditor(new JTextField()) {
             private com.intellij.openapi.ui.TextFieldWithBrowseButton filePicker;
             private JTextField textField;
             private boolean isFile = false;
@@ -60,7 +62,7 @@ public class ParamTablePanel extends JPanel {
 
             @Override
             public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
-                String typeStr = (String) table.getValueAt(row, 2);
+                String typeStr = (String) table.getValueAt(row, 3);
                 isFile = "File".equals(typeStr);
                 
                 if (isFile) {
@@ -90,6 +92,7 @@ public class ParamTablePanel extends JPanel {
                 newParam.setParamType(vn.io.codelearning.springapitester.model.ParamTypeEnum.QUERY_PARAM);
             }
             newParam.setRequired(false);
+            newParam.setEnabled(true);
             tableModel.params.add(newParam);
             tableModel.fireTableRowsInserted(tableModel.params.size() - 1, tableModel.params.size() - 1);
         });
@@ -114,7 +117,7 @@ public class ParamTablePanel extends JPanel {
     }
 
     private static class ParamTableModel extends AbstractTableModel {
-        private final String[] columnNames = {"Key", "Value", "Type"};
+        private final String[] columnNames = {"", "Key", "Value", "Type"};
         private List<ParameterModel> params = new ArrayList<>();
         private final List<vn.io.codelearning.springapitester.model.ParamTypeEnum> allowedTypes;
 
@@ -147,7 +150,7 @@ public class ParamTablePanel extends JPanel {
 
         @Override
         public int getColumnCount() {
-            return 3;
+            return 4;
         }
 
         @Override
@@ -156,11 +159,17 @@ public class ParamTablePanel extends JPanel {
         }
 
         @Override
+        public Class<?> getColumnClass(int columnIndex) {
+            if (columnIndex == 0) return Boolean.class;
+            return String.class;
+        }
+
+        @Override
         public boolean isCellEditable(int rowIndex, int columnIndex) {
-            // Cho phép sửa Tên (0), Giá trị (1) và Loại (2) 
             if (columnIndex == 0) return true;
             if (columnIndex == 1) return true;
-            if (columnIndex == 2) {
+            if (columnIndex == 2) return true;
+            if (columnIndex == 3) {
                 ParameterModel p = params.get(rowIndex);
                 return p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA 
                     || p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.MULTIPART_FILE;
@@ -172,9 +181,10 @@ public class ParamTablePanel extends JPanel {
         public Object getValueAt(int rowIndex, int columnIndex) {
             ParameterModel p = params.get(rowIndex);
             switch (columnIndex) {
-                case 0: return p.getName() + (p.isRequired() ? " *" : "");
-                case 1: return p.getCurrentValue() != null ? p.getCurrentValue() : "";
-                case 2: 
+                case 0: return p.isEnabled();
+                case 1: return p.getName() + (p.isRequired() ? " *" : "");
+                case 2: return p.getCurrentValue() != null ? p.getCurrentValue() : (p.getDefaultValue() != null ? p.getDefaultValue() : "");
+                case 3: 
                     if (p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA) return "Text";
                     if (p.getParamType() == vn.io.codelearning.springapitester.model.ParamTypeEnum.MULTIPART_FILE) return "File";
                     return p.getParamType().name();
@@ -185,14 +195,17 @@ public class ParamTablePanel extends JPanel {
         @Override
         public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
             if (columnIndex == 0) {
+                params.get(rowIndex).setEnabled((Boolean) aValue);
+                fireTableCellUpdated(rowIndex, columnIndex);
+            } else if (columnIndex == 1) {
                 String val = aValue.toString();
                 if (val.endsWith(" *")) val = val.substring(0, val.length() - 2);
                 params.get(rowIndex).setName(val);
                 fireTableCellUpdated(rowIndex, columnIndex);
-            } else if (columnIndex == 1) {
+            } else if (columnIndex == 2) {
                 params.get(rowIndex).setCurrentValue(aValue.toString());
                 fireTableCellUpdated(rowIndex, columnIndex);
-            } else if (columnIndex == 2) {
+            } else if (columnIndex == 3) {
                 String val = aValue.toString();
                 if ("Text".equals(val)) {
                     params.get(rowIndex).setParamType(vn.io.codelearning.springapitester.model.ParamTypeEnum.FORM_DATA);
@@ -202,8 +215,7 @@ public class ParamTablePanel extends JPanel {
                     params.get(rowIndex).setCurrentValue("");
                 }
                 fireTableCellUpdated(rowIndex, columnIndex);
-                // Cần update lại cột Value để hiển thị file picker hoặc text field tương ứng
-                fireTableCellUpdated(rowIndex, 1);
+                fireTableCellUpdated(rowIndex, 2);
             }
         }
     }

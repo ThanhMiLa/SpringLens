@@ -13,6 +13,7 @@ public class ParameterModel {
     private boolean required;
     private String currentValue;
     private String description;
+    private boolean enabled = true;
 
     public ParameterModel() {
     }
@@ -85,6 +86,14 @@ public class ParameterModel {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     @Override
