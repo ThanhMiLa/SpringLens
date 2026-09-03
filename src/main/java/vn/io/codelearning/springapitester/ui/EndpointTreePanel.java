@@ -269,22 +269,10 @@ public class EndpointTreePanel extends JPanel {
                         manualEp.setFolderId(savedEp.folderId);
                         manualEp.setHttpMethod(savedEp.httpMethod);
                         manualEp.setPath(savedEp.path);
-                        manualEp.setAuthConfig(state.resolveAuthConfig(savedEp));
-                        manualEp.setCustomHeaders(state.resolveHeaders(savedEp));
-                        manualEp.setRequestBodyJson(savedEp.requestBodyJson);
-                        manualEp.setBodyType(savedEp.bodyType);
-                        manualEp.setAllowInsecureTls(savedEp.allowInsecureTls);
-                        if (savedEp.manualParameters != null) {
-                            manualEp.getParameters().addAll(savedEp.manualParameters);
-                        }
-                        
-                        // Restore Response Cache
-                        manualEp.setLastResponseBody(savedEp.lastResponseBody);
-                        manualEp.setLastResponseStatusCode(savedEp.lastResponseStatusCode);
-                        manualEp.setLastResponseStatusMessage(savedEp.lastResponseStatusMessage);
-                        manualEp.setLastResponseTimeTakenMs(savedEp.lastResponseTimeTakenMs);
-                        manualEp.setLastResponseHeaders(savedEp.lastResponseHeaders);
-                        manualEp.setLastResponseFormat(savedEp.lastResponseFormat);
+
+                        // Delegate to restoreEndpoint — handles isAbsoluteUrl, TLS consent,
+                        // secret decryption, security overrides, and response cache
+                        state.restoreEndpoint(manualEp);
 
                         DefaultMutableTreeNode epNode = new DefaultMutableTreeNode(manualEp);
                         folderNode.add(epNode);
