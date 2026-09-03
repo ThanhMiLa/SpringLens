@@ -18,6 +18,8 @@ public class EndpointSavedState {
     public String requestBodyJson = "";
     public RequestBodyType bodyType = RequestBodyType.NONE;
     public boolean allowInsecureTls = false;
+    public String insecureTlsConsentHost = "";
+    public int insecureTlsConsentVersion = 0;
     public boolean isSecuredOverride = false;
     public boolean hasSecuredOverride = false;
 

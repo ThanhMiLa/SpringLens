@@ -87,6 +87,13 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         saved.requestBodyJson = persistRequestBodies ? endpoint.getRequestBodyJson() : "";
         saved.bodyType = endpoint.getBodyType();
         saved.allowInsecureTls = endpoint.isAllowInsecureTls();
+        if (endpoint.getInsecureTlsConsent() != null) {
+            saved.insecureTlsConsentHost = endpoint.getInsecureTlsConsent().getNormalizedHost();
+            saved.insecureTlsConsentVersion = endpoint.getInsecureTlsConsent().getPolicyVersion();
+        } else {
+            saved.insecureTlsConsentHost = "";
+            saved.insecureTlsConsentVersion = 0;
+        }
         saved.isSecuredOverride = endpoint.isSecured();
         
         // Response Cache
@@ -263,6 +270,12 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         // Restore Body Type and Security
         endpoint.setBodyType(saved.bodyType);
         endpoint.setAllowInsecureTls(saved.allowInsecureTls);
+        if (saved.allowInsecureTls && saved.insecureTlsConsentHost != null && !saved.insecureTlsConsentHost.isEmpty()) {
+            endpoint.setInsecureTlsConsent(new vn.io.codelearning.springapitester.client.InsecureTlsConsent(
+                    saved.insecureTlsConsentHost, saved.insecureTlsConsentVersion));
+        } else if (!saved.allowInsecureTls) {
+            endpoint.revokeInsecureTlsConsent();
+        }
         if (saved.hasSecuredOverride) {
             endpoint.setSecured(saved.isSecuredOverride);
         }

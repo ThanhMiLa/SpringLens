@@ -170,6 +170,14 @@ public class EndpointDetailPanel extends JPanel {
                             currentEndpoint.setPath(url);
                         }
                     }
+                    if (currentEndpoint.getInsecureTlsConsent() != null) {
+                        okhttp3.HttpUrl parsed = okhttp3.HttpUrl.parse(url);
+                        String host = parsed != null ? parsed.host() : "";
+                        if (!currentEndpoint.getInsecureTlsConsent().matchesHost(host)) {
+                            currentEndpoint.revokeInsecureTlsConsent();
+                            insecureTlsCheckBox.setSelected(false);
+                        }
+                    }
                     if (onEndpointUpdated != null) {
                         onEndpointUpdated.run();
                     }
@@ -273,19 +281,36 @@ public class EndpointDetailPanel extends JPanel {
         insecureTlsCheckBox.addActionListener(e -> {
             if (isUpdatingUI || currentEndpoint == null) return;
             if (insecureTlsCheckBox.isSelected()) {
+                String fullUrl = urlField.getText().trim();
+                okhttp3.HttpUrl parsed = okhttp3.HttpUrl.parse(fullUrl);
+                String host = parsed != null ? parsed.host() : "localhost";
+                if (!HttpClientService.isLocalDevelopmentHost(host)) {
+                    com.intellij.openapi.ui.Messages.showErrorDialog(
+                            project,
+                            "Insecure TLS is only allowed for localhost or loopback development hosts.",
+                            "Insecure TLS Prohibited"
+                    );
+                    insecureTlsCheckBox.setSelected(false);
+                    currentEndpoint.revokeInsecureTlsConsent();
+                    return;
+                }
                 int choice = com.intellij.openapi.ui.Messages.showYesNoDialog(
                         project,
-                        "This disables certificate validation for local requests and can expose credentials. Enable it only for a trusted development server.",
+                        "This disables certificate validation for host '" + host + "' and can expose credentials. Enable it only for a trusted development server.",
                         "Enable Insecure Local TLS",
                         "Enable",
                         "Cancel",
                         com.intellij.openapi.ui.Messages.getWarningIcon()
                 );
-                if (choice != com.intellij.openapi.ui.Messages.YES) {
+                if (choice == com.intellij.openapi.ui.Messages.YES) {
+                    currentEndpoint.grantInsecureTlsConsent(host);
+                } else {
                     insecureTlsCheckBox.setSelected(false);
+                    currentEndpoint.revokeInsecureTlsConsent();
                 }
+            } else {
+                currentEndpoint.revokeInsecureTlsConsent();
             }
-            currentEndpoint.setAllowInsecureTls(insecureTlsCheckBox.isSelected());
         });
         JPanel privacyOptions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         privacyOptions.add(insecureTlsCheckBox);
@@ -799,7 +824,7 @@ public class EndpointDetailPanel extends JPanel {
             try {
                 Request request = HttpRequestBuilder.buildRequest(requestEndpoint, fullUrl);
                 HttpClientService.RequestHandle handle = HttpClientService.getInstance(project)
-                        .execute(request, requestEndpoint.isAllowInsecureTls());
+                        .execute(request, requestEndpoint.getInsecureTlsConsent());
                 activeRequests.add(handle);
                 handle.future().whenComplete((response, error) -> {
                     activeRequests.remove(handle);

@@ -34,6 +34,7 @@ public class EndpointModel {
     private String moduleName;            // Service chứa endpoint
     private String directBaseUrl;         // URL gọi trực tiếp (http://localhost:8081)
     private boolean allowInsecureTls = false;
+    private transient vn.io.codelearning.springapitester.client.InsecureTlsConsent insecureTlsConsent;
 
     // Cached Response fields
     private String lastResponseBody = "";
@@ -319,6 +320,30 @@ public class EndpointModel {
 
     public void setAllowInsecureTls(boolean allowInsecureTls) {
         this.allowInsecureTls = allowInsecureTls;
+        if (allowInsecureTls && this.insecureTlsConsent == null) {
+            this.insecureTlsConsent = new vn.io.codelearning.springapitester.client.InsecureTlsConsent("localhost");
+        } else if (!allowInsecureTls) {
+            this.insecureTlsConsent = null;
+        }
+    }
+
+    public vn.io.codelearning.springapitester.client.InsecureTlsConsent getInsecureTlsConsent() {
+        return insecureTlsConsent;
+    }
+
+    public void setInsecureTlsConsent(vn.io.codelearning.springapitester.client.InsecureTlsConsent consent) {
+        this.insecureTlsConsent = consent;
+        this.allowInsecureTls = (consent != null);
+    }
+
+    public void grantInsecureTlsConsent(String host) {
+        this.insecureTlsConsent = new vn.io.codelearning.springapitester.client.InsecureTlsConsent(host);
+        this.allowInsecureTls = true;
+    }
+
+    public void revokeInsecureTlsConsent() {
+        this.insecureTlsConsent = null;
+        this.allowInsecureTls = false;
     }
 
     public String getLastResponseBody() {

@@ -131,30 +131,37 @@ public class HttpClientService implements Disposable {
         }
     }
 
-    /**
-     * Thực thi request bất đồng bộ, trả về CompletableFuture không làm đơ giao diện.
-     */
     public CompletableFuture<HttpResponseModel> executeAsync(Request request) {
-        return executeAsync(request, false);
+        return execute(request, (InsecureTlsConsent) null).future();
     }
 
-    /**
-     * Executes a request with secure TLS by default. Certificate validation may only be
-     * disabled for loopback development hosts after the caller has obtained user consent.
-     */
     public CompletableFuture<HttpResponseModel> executeAsync(Request request, boolean allowInsecureTls) {
         return execute(request, allowInsecureTls).future();
     }
 
+    public CompletableFuture<HttpResponseModel> executeAsync(Request request, InsecureTlsConsent consent) {
+        return execute(request, consent).future();
+    }
+
     public RequestHandle execute(Request request, boolean allowInsecureTls) {
+        InsecureTlsConsent consent = allowInsecureTls && request != null
+                ? new InsecureTlsConsent(request.url().host())
+                : null;
+        return execute(request, consent);
+    }
+
+    public RequestHandle execute(Request request, InsecureTlsConsent consent) {
         if (request == null) {
             throw new IllegalArgumentException("Request must not be null");
         }
         OkHttpClient client = secureClient;
-        if (allowInsecureTls) {
+        if (consent != null) {
             String host = request.url().host();
             if (!isLocalDevelopmentHost(host)) {
                 throw new IllegalArgumentException("Insecure TLS is only allowed for localhost or loopback addresses");
+            }
+            if (!consent.matchesHost(host)) {
+                throw new SecurityException("Insecure TLS consent host '" + consent.getNormalizedHost() + "' does not match request host '" + host + "'");
             }
             client = getUnsafeLocalClient();
         }
@@ -226,7 +233,7 @@ public class HttpClientService implements Disposable {
         }
     }
 
-    static boolean isLocalDevelopmentHost(String host) {
+    public static boolean isLocalDevelopmentHost(String host) {
         if (host == null || host.isBlank()) return false;
         String normalized = host.trim().toLowerCase(Locale.ROOT);
         if (normalized.endsWith(".")) {
