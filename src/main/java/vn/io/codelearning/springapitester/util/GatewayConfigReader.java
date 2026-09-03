@@ -46,6 +46,11 @@ public class GatewayConfigReader {
 
     public static GatewayConfig findGatewayConfig(Project project) {
         if (project == null || project.isDisposed()) return null;
+        vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService service =
+                vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.getInstance(project);
+        if (service != null) {
+            return service.resolveGatewayConfig();
+        }
         try {
             if (ApplicationManager.getApplication().isReadAccessAllowed()) {
                 return doFindGatewayConfig(project);
@@ -239,5 +244,8 @@ public class GatewayConfigReader {
         public String port = "8080";
         public boolean discoveryLocatorEnabled = false;
         public List<GatewayRouteModel> routes = new ArrayList<>();
+        public String sourceFile = "";
+        public boolean isFallback = true;
+        public List<String> diagnostics = new ArrayList<>();
     }
 }

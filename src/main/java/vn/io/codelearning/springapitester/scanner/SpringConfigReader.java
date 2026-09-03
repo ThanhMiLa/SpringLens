@@ -44,11 +44,14 @@ public final class SpringConfigReader {
      * Thứ tự ưu tiên: base config → profile config (profile ghi đè base).
      */
     public static SpringServerConfig readServerConfig(Project project) {
-        SpringServerConfig config = new SpringServerConfig();
         if (project == null || project.isDisposed()) {
-            return config;
+            return new SpringServerConfig();
         }
-
+        SpringConfigResolutionService service = SpringConfigResolutionService.getInstance(project);
+        if (service != null) {
+            return service.resolveServerConfig();
+        }
+        SpringServerConfig config = new SpringServerConfig();
         try {
             if (com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed()) {
                 doReadServerConfig(project, config);
@@ -60,7 +63,6 @@ public final class SpringConfigReader {
         } catch (Throwable t) {
             // ignore
         }
-
         return config;
     }
 

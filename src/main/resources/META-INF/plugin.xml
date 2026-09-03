@@ -65,5 +65,6 @@
                     icon="/icons/springlens.svg"/>
         <projectService serviceImplementation="vn.io.codelearning.springapitester.state.SpringLensState"/>
         <projectService serviceImplementation="vn.io.codelearning.springapitester.client.HttpClientService"/>
+        <projectService serviceImplementation="vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService"/>
     </extensions>
 </idea-plugin>

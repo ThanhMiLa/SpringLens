@@ -593,6 +593,23 @@ public class EndpointDetailPanel extends JPanel {
                     effectiveBaseUrl, endpoint.getPath(), endpoint.isAbsoluteUrl());
             urlField.setText(fullUrl);
 
+            vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService configService =
+                    project != null && !project.isDisposed() ? vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.getInstance(project) : null;
+            if (configService != null && !endpoint.isAbsoluteUrl() && !endpoint.isManual()) {
+                vn.io.codelearning.springapitester.scanner.SpringServerConfig serverConfig = configService.resolveServerConfig();
+                if (serverConfig != null) {
+                    if (serverConfig.hasUnresolvedPlaceholder()) {
+                        urlField.setToolTipText("Warning: Configuration has unresolved placeholders; fallback port used.");
+                    } else if (serverConfig.isFallback()) {
+                        urlField.setToolTipText("Info: Default fallback port used (no server.port configured).");
+                    } else {
+                        urlField.setToolTipText("Resolved from: " + serverConfig.getSourceFile());
+                    }
+                }
+            } else {
+                urlField.setToolTipText(null);
+            }
+
             paramPanel.setParameters(endpoint.getParameters());
             headerParamPanel.setParameters(endpoint.getParameters());
             cookiePanel.setParameters(endpoint.getParameters());
