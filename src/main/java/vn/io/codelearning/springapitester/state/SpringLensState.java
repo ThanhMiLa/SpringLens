@@ -251,7 +251,6 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
 
     public void migrateLegacyKeys(List<vn.io.codelearning.springapitester.model.EndpointModel> discoveredEndpoints) {
         if (discoveredEndpoints == null || discoveredEndpoints.isEmpty()) {
-            this.schemaVersion = 3;
             return;
         }
 
@@ -309,7 +308,21 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
                 activeKeys.add(getEndpointKey(ep));
             }
         }
-        endpoints.keySet().removeIf(key -> key.startsWith("scanned:") && !activeKeys.contains(key));
+        List<String> keysToRemove = new ArrayList<>();
+        for (String key : endpoints.keySet()) {
+            if (key.startsWith("scanned:") && !activeKeys.contains(key)) {
+                keysToRemove.add(key);
+            }
+        }
+        CredentialStore store = credentialStore();
+        for (String key : keysToRemove) {
+            EndpointSavedState removed = endpoints.remove(key);
+            if (removed != null && removed.credentialId != null && !removed.credentialId.isBlank()) {
+                if (store != null) {
+                    store.delete(removed.credentialId);
+                }
+            }
+        }
     }
 
     public boolean restoreQuarantinedEndpoint(String quarantineKey, vn.io.codelearning.springapitester.model.EndpointModel target) {
