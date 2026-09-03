@@ -125,7 +125,7 @@ public class ResponseCachingTest {
         // By default, bodies and response history are persisted (with sensitive headers redacted)
         state.saveEndpoint(endpoint);
         EndpointSavedState savedDefault = state.endpoints.get(state.getEndpointKey(endpoint));
-        Assert.assertEquals("{\"password\":\"secret\"}", savedDefault.requestBodyJson);
+        Assert.assertEquals("{\"password\":\"[REDACTED]\"}", savedDefault.requestBodyJson);
         Assert.assertEquals("{\"token\":\"[REDACTED]\"}", savedDefault.lastResponseBody);
         Assert.assertEquals("Authorization: [REDACTED]\nSet-Cookie: [REDACTED]", savedDefault.lastResponseHeaders);
 

@@ -89,7 +89,9 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
                 : endpoints.get(getEndpointKey(endpoint));
         saved.credentialId = oldSaved != null && oldSaved.credentialId != null && !oldSaved.credentialId.isBlank()
                 ? oldSaved.credentialId : UUID.randomUUID().toString();
-        saved.requestBodyJson = persistRequestBodies ? endpoint.getRequestBodyJson() : "";
+        saved.requestBodyJson = persistRequestBodies && endpoint.getRequestBodyJson() != null
+                ? SensitiveValueClassifier.redactSensitiveJson(endpoint.getRequestBodyJson())
+                : "";
         saved.bodyType = endpoint.getBodyType();
         saved.allowInsecureTls = endpoint.isAllowInsecureTls();
         if (endpoint.getInsecureTlsConsent() != null) {
