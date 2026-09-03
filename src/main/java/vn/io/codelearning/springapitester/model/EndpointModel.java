@@ -324,9 +324,7 @@ public class EndpointModel {
 
     public void setAllowInsecureTls(boolean allowInsecureTls) {
         this.allowInsecureTls = allowInsecureTls;
-        if (allowInsecureTls && this.insecureTlsConsent == null) {
-            this.insecureTlsConsent = new vn.io.codelearning.springapitester.client.InsecureTlsConsent("localhost");
-        } else if (!allowInsecureTls) {
+        if (!allowInsecureTls) {
             this.insecureTlsConsent = null;
         }
     }
@@ -337,7 +335,9 @@ public class EndpointModel {
 
     public void setInsecureTlsConsent(vn.io.codelearning.springapitester.client.InsecureTlsConsent consent) {
         this.insecureTlsConsent = consent;
-        this.allowInsecureTls = (consent != null);
+        if (consent != null) {
+            this.allowInsecureTls = true;
+        }
     }
 
     public void grantInsecureTlsConsent(String host) {

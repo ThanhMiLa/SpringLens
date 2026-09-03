@@ -27,7 +27,7 @@ public class HttpClientServiceTest {
         HttpClientService service = new HttpClientService();
         IllegalArgumentException error = Assert.assertThrows(
                 IllegalArgumentException.class,
-                () -> service.executeAsync(request, true)
+                () -> service.executeAsync(request, new InsecureTlsConsent(request.url().host()))
         );
         Assert.assertTrue(error.getMessage().contains("localhost"));
     }
@@ -113,5 +113,23 @@ public class HttpClientServiceTest {
 
         Assert.assertTrue(consentB.matchesHost("localhost"));
         Assert.assertFalse(consentB.matchesHost("127.0.0.1"));
+    }
+
+    @Test
+    public void testEndpointModelSetAllowInsecureTlsDoesNotAutoSynthesizeConsent() {
+        vn.io.codelearning.springapitester.model.EndpointModel ep =
+                new vn.io.codelearning.springapitester.model.EndpointModel(
+                        vn.io.codelearning.springapitester.model.HttpMethodEnum.GET, "/api", "C", "P", "m");
+        Assert.assertNull(ep.getInsecureTlsConsent());
+        ep.setAllowInsecureTls(true);
+        // Must NOT synthesize consent automatically
+        Assert.assertNull(ep.getInsecureTlsConsent());
+
+        ep.grantInsecureTlsConsent("localhost");
+        Assert.assertNotNull(ep.getInsecureTlsConsent());
+        Assert.assertTrue(ep.isAllowInsecureTls());
+
+        ep.setAllowInsecureTls(false);
+        Assert.assertNull(ep.getInsecureTlsConsent());
     }
 }

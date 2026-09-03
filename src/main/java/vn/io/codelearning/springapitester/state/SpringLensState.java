@@ -363,11 +363,13 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         // Restore Body Type and Security
         endpoint.setBodyType(saved.bodyType);
         endpoint.setAllowInsecureTls(saved.allowInsecureTls);
-        if (saved.allowInsecureTls && saved.insecureTlsConsentHost != null && !saved.insecureTlsConsentHost.isEmpty()) {
+        if (saved.allowInsecureTls && saved.insecureTlsConsentHost != null && !saved.insecureTlsConsentHost.isEmpty()
+                && saved.insecureTlsConsentVersion == vn.io.codelearning.springapitester.client.InsecureTlsConsent.CURRENT_POLICY_VERSION
+                && vn.io.codelearning.springapitester.client.HttpClientService.isLocalDevelopmentHost(saved.insecureTlsConsentHost)) {
             endpoint.setInsecureTlsConsent(new vn.io.codelearning.springapitester.client.InsecureTlsConsent(
                     saved.insecureTlsConsentHost, saved.insecureTlsConsentVersion));
-        } else if (!saved.allowInsecureTls) {
-            endpoint.revokeInsecureTlsConsent();
+        } else {
+            endpoint.setInsecureTlsConsent(null);
         }
         if (saved.hasSecuredOverride) {
             endpoint.setSecured(saved.isSecuredOverride);
