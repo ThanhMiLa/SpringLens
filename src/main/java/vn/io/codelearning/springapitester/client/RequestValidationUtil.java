@@ -25,8 +25,22 @@ public final class RequestValidationUtil {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Header name must not be blank");
         }
-        if (name.contains("\r") || name.contains("\n") || (value != null && (value.contains("\r") || value.contains("\n")))) {
-            throw new IllegalArgumentException("Header name or value contains illegal newline characters: " + name);
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c <= 32 || c >= 127 || c == ':') {
+                throw new IllegalArgumentException("Header name contains invalid character: '" + c + "' in " + name);
+            }
+        }
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                if (c == '\r' || c == '\n') {
+                    throw new IllegalArgumentException("Header value contains illegal newline characters in header: " + name);
+                }
+                if (c < 32 && c != '\t') {
+                    throw new IllegalArgumentException("Header value contains illegal control character in header: " + name);
+                }
+            }
         }
     }
 
@@ -34,11 +48,22 @@ public final class RequestValidationUtil {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Cookie name must not be blank");
         }
-        if (name.contains("\r") || name.contains("\n") || (value != null && (value.contains("\r") || value.contains("\n")))) {
-            throw new IllegalArgumentException("Cookie name or value contains illegal newline characters: " + name);
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c <= 32 || c >= 127 || c == ';' || c == '=' || c == ',' || c == '"') {
+                throw new IllegalArgumentException("Cookie name contains invalid character: '" + c + "' in " + name);
+            }
         }
-        if (name.contains(";") || name.contains("=")) {
-            throw new IllegalArgumentException("Cookie name contains illegal characters: " + name);
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                if (c == '\r' || c == '\n') {
+                    throw new IllegalArgumentException("Cookie value contains illegal newline characters in cookie: " + name);
+                }
+                if (c < 32 || c == 127 || c == ';') {
+                    throw new IllegalArgumentException("Cookie value contains invalid character in cookie: " + name);
+                }
+            }
         }
     }
 

@@ -6,6 +6,7 @@ import org.junit.Test;
 import vn.io.codelearning.springapitester.model.*;
 
 import java.io.IOException;
+import java.util.Map;
 
 public class HttpRequestBuilderTest {
 
@@ -290,5 +291,88 @@ public class HttpRequestBuilderTest {
         Assert.assertTrue(bodyContent.contains("content 2"));
         Assert.assertTrue(bodyContent.contains("name=\"config\""));
         Assert.assertTrue(bodyContent.contains("Content-Type: application/json"));
+    }
+
+    @Test
+    public void testHeaderPrecedenceAuthOverParamOverCustom() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/test", "TestCtrl", "com.example", "test");
+        
+        // 1. Custom Headers
+        endpoint.addCustomHeader("Authorization", "CustomVal");
+        endpoint.addCustomHeader("X-Trace", "CustomTrace");
+        endpoint.addCustomHeader("X-Custom-Only", "CustomOnly");
+
+        // 2. RequestHeader params (should override Custom Headers)
+        ParameterModel pAuth = new ParameterModel("Authorization", ParamTypeEnum.HEADER, "String");
+        pAuth.setCurrentValue("ParamAuth");
+        ParameterModel pTrace = new ParameterModel("X-Trace", ParamTypeEnum.HEADER, "String");
+        pTrace.setCurrentValue("ParamTrace");
+        endpoint.addParameter(pAuth);
+        endpoint.addParameter(pTrace);
+
+        // 3. AuthConfig (should override both RequestHeader and Custom Headers)
+        AuthConfig auth = new AuthConfig();
+        auth.setAuthType(AuthTypeEnum.BEARER_TOKEN);
+        auth.setBearerToken("StrictAuthToken");
+        endpoint.setAuthConfig(auth);
+
+        ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(endpoint, "http://localhost:8080/api/test");
+        Map<String, String> headers = resolved.getHeaders();
+
+        Assert.assertEquals("Bearer StrictAuthToken", headers.get("Authorization"));
+        Assert.assertEquals("ParamTrace", headers.get("X-Trace"));
+        Assert.assertEquals("CustomOnly", headers.get("X-Custom-Only"));
+    }
+
+    @Test
+    public void testCookieCollisionResolutionAndRfc6265Format() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/cookies", "CookieCtrl", "com.example", "cookies");
+        
+        // Initial cookie from custom header
+        endpoint.addCustomHeader("Cookie", "session=first; lang=en");
+
+        // Cookie param overriding session
+        ParameterModel c1 = new ParameterModel("session", ParamTypeEnum.COOKIE, "String");
+        c1.setCurrentValue("second");
+        endpoint.addParameter(c1);
+
+        // Later cookie param overriding session again (latest enabled wins)
+        ParameterModel c2 = new ParameterModel("session", ParamTypeEnum.COOKIE, "String");
+        c2.setCurrentValue("third");
+        endpoint.addParameter(c2);
+
+        // Additional cookie
+        ParameterModel c3 = new ParameterModel("theme", ParamTypeEnum.COOKIE, "String");
+        c3.setCurrentValue("dark");
+        endpoint.addParameter(c3);
+
+        ResolvedRequest resolved = HttpRequestBuilder.resolveRequest(endpoint, "http://localhost:8080/api/cookies");
+        String cookieHeader = resolved.getHeaders().get("Cookie");
+
+        Assert.assertEquals("session=third; lang=en; theme=dark", cookieHeader);
+    }
+
+    @Test
+    public void testRejectionOfCrlfAndControlCharacters() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/test", "TestCtrl", "com.example", "test");
+        
+        // Header with CRLF injection
+        endpoint.addCustomHeader("X-Injected\r\nInjected-Header", "value");
+        Assert.assertThrows(IllegalArgumentException.class, () ->
+                HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8080/api/test"));
+
+        // Header value with CRLF
+        EndpointModel ep2 = new EndpointModel(HttpMethodEnum.GET, "/api/test", "TestCtrl", "com.example", "test");
+        ep2.addCustomHeader("X-Normal", "value\r\nSet-Cookie: evil=1");
+        Assert.assertThrows(IllegalArgumentException.class, () ->
+                HttpRequestBuilder.buildRequest(ep2, "http://localhost:8080/api/test"));
+
+        // Cookie with invalid delimiters or CRLF
+        EndpointModel ep3 = new EndpointModel(HttpMethodEnum.GET, "/api/test", "TestCtrl", "com.example", "test");
+        ParameterModel badCookie = new ParameterModel("bad;cookie", ParamTypeEnum.COOKIE, "String");
+        badCookie.setCurrentValue("val");
+        ep3.addParameter(badCookie);
+        Assert.assertThrows(IllegalArgumentException.class, () ->
+                HttpRequestBuilder.buildRequest(ep3, "http://localhost:8080/api/test"));
     }
 }

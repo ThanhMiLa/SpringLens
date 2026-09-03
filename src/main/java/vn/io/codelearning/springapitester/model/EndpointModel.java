@@ -222,6 +222,10 @@ public class EndpointModel {
         }
     }
 
+    public void addCustomHeader(String key, String value) {
+        addCustomHeader(new HeaderItem(key, value));
+    }
+
     public List<ParameterModel> getPathVariables() {
         return parameters.stream()
                 .filter(p -> p.getParamType() == ParamTypeEnum.PATH_VARIABLE)
