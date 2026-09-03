@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBTabbedPane;
@@ -18,6 +19,8 @@ import vn.io.codelearning.springapitester.model.ParamTypeEnum;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class EndpointDetailPanel extends JPanel {
 
@@ -58,6 +61,10 @@ public class EndpointDetailPanel extends JPanel {
     private java.util.function.Consumer<vn.io.codelearning.springapitester.model.AuthConfig> onApplyToAllAuth;
 
     private boolean isUpdatingUI = false;
+    private volatile boolean disposed = false;
+    private final vn.io.codelearning.springapitester.client.RequestExecutionTracker requestTracker =
+            new vn.io.codelearning.springapitester.client.RequestExecutionTracker();
+    private final Set<HttpClientService.RequestHandle> activeRequests = ConcurrentHashMap.newKeySet();
 
     public void setOnEndpointUpdated(Runnable onEndpointUpdated) {
         this.onEndpointUpdated = onEndpointUpdated;
@@ -100,6 +107,13 @@ public class EndpointDetailPanel extends JPanel {
 
     public EndpointDetailPanel(Project project) {
         this.project = project;
+        Disposer.register(project, () -> {
+            disposed = true;
+            activeRequests.forEach(HttpClientService.RequestHandle::cancel);
+            activeRequests.clear();
+            CodeEditorUtil.releaseEditor(requestBodyEditor);
+            CodeEditorUtil.releaseEditor(responseBodyEditor);
+        });
         setLayout(new BorderLayout());
         setMinimumSize(new Dimension(100, 100));
 
@@ -489,6 +503,7 @@ public class EndpointDetailPanel extends JPanel {
 
         isUpdatingUI = true;
         try {
+            sendBtn.setEnabled(true);
             vn.io.codelearning.springapitester.model.HttpMethodEnum method = endpoint.getHttpMethod() != null ? endpoint.getHttpMethod() : vn.io.codelearning.springapitester.model.HttpMethodEnum.GET;
             methodComboBox.setSelectedItem(method);
             updateMethodComboColor(method);
@@ -636,177 +651,162 @@ public class EndpointDetailPanel extends JPanel {
     }
 
     private void onSendClicked() {
-        if (currentEndpoint == null) return;
+        if (currentEndpoint == null || disposed) return;
         collectDataToModel();
 
+        EndpointModel requestEndpoint = currentEndpoint;
         String fullUrl = urlField.getText();
-        
-        // Validate Path Variables: Check if any unpopulated path variables remain
         String testUrl = fullUrl;
-        if (currentEndpoint.getParameters() != null) {
-            for (ParameterModel param : currentEndpoint.getParameters()) {
-                if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
-                    String val = param.getCurrentValue() != null ? param.getCurrentValue().trim() : "";
-                    if (!val.isEmpty()) {
-                        testUrl = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(testUrl, param.getName(), val);
-                    }
+        for (ParameterModel param : requestEndpoint.getParameters()) {
+            if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
+                String value = param.getCurrentValue() != null ? param.getCurrentValue().trim() : "";
+                if (!value.isEmpty()) {
+                    testUrl = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(
+                            testUrl, param.getName(), value);
                 }
             }
         }
-        
+
         if (vn.io.codelearning.springapitester.scanner.SpringUrlUtils.hasUnresolvedPathVariables(testUrl)) {
-            java.util.List<String> missing = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.getUnresolvedPathVariables(testUrl);
-            String missingNames = String.join(", ", missing);
-            JOptionPane.showMessageDialog(this, 
-                "Please fill in value for Path Variable: {" + missingNames + "} in the Params tab before sending.",
-                "Missing Path Variable", 
-                JOptionPane.WARNING_MESSAGE);
-            if (requestTabs != null) {
-                requestTabs.setSelectedIndex(0); // Switch to Params tab
-            }
+            String missing = String.join(", ",
+                    vn.io.codelearning.springapitester.scanner.SpringUrlUtils.getUnresolvedPathVariables(testUrl));
+            JOptionPane.showMessageDialog(this,
+                    "Please fill in value for Path Variable: {" + missing + "} in the Params tab before sending.",
+                    "Missing Path Variable", JOptionPane.WARNING_MESSAGE);
+            requestTabs.setSelectedIndex(0);
             return;
         }
 
+        String endpointId = requestEndpoint.getId() != null
+                ? requestEndpoint.getId() : "legacy-" + System.identityHashCode(requestEndpoint);
+        long sequence = requestTracker.begin(endpointId);
         sendBtn.setEnabled(false);
         statusLabel.setText("Sending...");
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             try {
-                Request request = HttpRequestBuilder.buildRequest(currentEndpoint, fullUrl);
-                
-                HttpClientService.getInstance().executeAsync(request, currentEndpoint.isAllowInsecureTls()).thenAccept(response -> {
+                Request request = HttpRequestBuilder.buildRequest(requestEndpoint, fullUrl);
+                HttpClientService.RequestHandle handle = HttpClientService.getInstance()
+                        .execute(request, requestEndpoint.isAllowInsecureTls());
+                activeRequests.add(handle);
+                handle.future().whenComplete((response, error) -> {
+                    activeRequests.remove(handle);
+                    if (disposed || project.isDisposed()) return;
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        int code = response.getStatusCode();
-                        String colorHex = "#7A7A7A"; // Default gray
-                        if (code >= 200 && code < 300) colorHex = "#5CB85C"; // Green
-                        else if (code >= 300 && code < 400) colorHex = "#5BC0DE"; // Cyan
-                        else if (code >= 400 && code < 600) colorHex = "#D9534F"; // Red
-                        
-                        String msg = response.getStatusMessage();
-                        if (msg == null || msg.isBlank()) {
-                            msg = getHttpStatusMessage(code);
-                        }
-                        
-                        String html = String.format("<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span><font color='gray'> &nbsp; %d ms</font></html>", 
-                                                    colorHex, code, msg, response.getTimeTakenMs());
-                        statusLabel.setText(html);
-                        
-                        String bodyText = response.getBody() != null ? response.getBody() : "";
-
-                        // Update Response Body Editor
-                        ApplicationManager.getApplication().runWriteAction(() -> {
-                            // Find Content-Type
-                            String contentType = "";
-                            if (response.getHeaders() != null) {
-                                for (java.util.Map.Entry<String, java.util.List<String>> entry : response.getHeaders().entrySet()) {
-                                    if ("Content-Type".equalsIgnoreCase(entry.getKey()) && !entry.getValue().isEmpty()) {
-                                        contentType = entry.getValue().get(0).toLowerCase();
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            // Auto-select dropdown without triggering action listener yet
-                            String targetFormat = "TEXT";
-                            if (contentType.contains("json")) targetFormat = "JSON";
-                            else if (contentType.contains("html")) targetFormat = "HTML";
-                            else if (contentType.contains("xml")) targetFormat = "XML";
-                            
-                            isUpdatingUI = true;
-                            try {
-                                if (!targetFormat.equals(responseLanguageCombo.getSelectedItem())) {
-                                    responseLanguageCombo.setSelectedItem(targetFormat);
-                                }
-                            } finally {
-                                isUpdatingUI = false;
-                            }
-                            
-                            responseBodyEditor.getDocument().setText(bodyText);
-                        });
-
-                        // Update Headers
-                        StringBuilder headersStr = new StringBuilder();
-                        if (response.getHeaders() != null) {
-                            response.getHeaders().forEach((k, vList) -> {
-                                for (String v : vList) {
-                                    headersStr.append(k).append(": ").append(v).append("\n");
-                                }
-                            });
-                        }
-                        String headersText = headersStr.toString();
-                        responseHeadersArea.setText(headersText);
-
-                        // Save Response Cache to Model & Persistent State
-                        if (currentEndpoint != null) {
-                            currentEndpoint.setLastResponseStatusCode(code);
-                            currentEndpoint.setLastResponseStatusMessage(msg);
-                            currentEndpoint.setLastResponseTimeTakenMs(response.getTimeTakenMs());
-                            currentEndpoint.setLastResponseBody(bodyText);
-                            currentEndpoint.setLastResponseHeaders(headersText);
-                            String selectedFormat = (String) responseLanguageCombo.getSelectedItem();
-                            currentEndpoint.setLastResponseFormat(selectedFormat != null ? selectedFormat : "JSON");
-
-                            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
-                            if (state != null) {
-                                state.saveEndpoint(currentEndpoint);
+                        if (disposed || project.isDisposed()) return;
+                        boolean latest = requestTracker.isLatest(endpointId, sequence);
+                        if (latest) {
+                            boolean showInUi = currentEndpoint == requestEndpoint;
+                            if (error == null) {
+                                applySuccessfulResponse(requestEndpoint, response, showInUi);
+                            } else {
+                                applyFailedResponse(requestEndpoint, "Error: " + rootMessage(error), showInUi);
                             }
                         }
-
-                        sendBtn.setEnabled(true);
+                        requestTracker.clear(endpointId, sequence);
                     });
-                }).exceptionally(ex -> {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        String errorMsg = "Error: " + ex.getMessage();
-                        statusLabel.setText(errorMsg);
-                        ApplicationManager.getApplication().runWriteAction(() -> {
-                            responseBodyEditor.getDocument().setText(errorMsg);
-                        });
-                        responseHeadersArea.setText("");
-
-                        if (currentEndpoint != null) {
-                            currentEndpoint.setLastResponseStatusCode(0);
-                            currentEndpoint.setLastResponseStatusMessage(errorMsg);
-                            currentEndpoint.setLastResponseTimeTakenMs(0);
-                            currentEndpoint.setLastResponseBody(errorMsg);
-                            currentEndpoint.setLastResponseHeaders("");
-                            currentEndpoint.setLastResponseFormat("TEXT");
-
-                            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
-                            if (state != null) {
-                                state.saveEndpoint(currentEndpoint);
-                            }
-                        }
-                        sendBtn.setEnabled(true);
-                    });
-                    return null;
                 });
-                
-            } catch (Exception ex) {
+            } catch (Exception error) {
+                if (disposed || project.isDisposed()) return;
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    String errorMsg = "Failed to build request: " + ex.getMessage();
-                    statusLabel.setText(errorMsg);
-                    ApplicationManager.getApplication().runWriteAction(() -> {
-                        responseBodyEditor.getDocument().setText(errorMsg);
-                    });
-                    responseHeadersArea.setText("");
-
-                    if (currentEndpoint != null) {
-                        currentEndpoint.setLastResponseStatusCode(0);
-                        currentEndpoint.setLastResponseStatusMessage(errorMsg);
-                        currentEndpoint.setLastResponseTimeTakenMs(0);
-                        currentEndpoint.setLastResponseBody(errorMsg);
-                        currentEndpoint.setLastResponseHeaders("");
-                        currentEndpoint.setLastResponseFormat("TEXT");
-
-                        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
-                        if (state != null) {
-                            state.saveEndpoint(currentEndpoint);
-                        }
+                    if (disposed || project.isDisposed()) return;
+                    boolean latest = requestTracker.isLatest(endpointId, sequence);
+                    if (latest) {
+                        applyFailedResponse(requestEndpoint, "Failed to build request: " + rootMessage(error),
+                                currentEndpoint == requestEndpoint);
                     }
-                    sendBtn.setEnabled(true);
+                    requestTracker.clear(endpointId, sequence);
                 });
             }
         });
+    }
+
+    private void applySuccessfulResponse(EndpointModel endpoint,
+                                         vn.io.codelearning.springapitester.client.HttpResponseModel response,
+                                         boolean showInUi) {
+        int code = response.getStatusCode();
+        String message = response.getStatusMessage();
+        if (message == null || message.isBlank()) message = getHttpStatusMessage(code);
+        String body = response.getBody() != null ? response.getBody() : "";
+        String headers = formatResponseHeaders(response);
+        String format = detectResponseFormat(response);
+
+        endpoint.setLastResponseStatusCode(code);
+        endpoint.setLastResponseStatusMessage(message);
+        endpoint.setLastResponseTimeTakenMs(response.getTimeTakenMs());
+        endpoint.setLastResponseBody(body);
+        endpoint.setLastResponseHeaders(headers);
+        endpoint.setLastResponseFormat(format);
+        saveEndpointState(endpoint);
+
+        if (!showInUi) return;
+        String color = code >= 200 && code < 300 ? "#5CB85C"
+                : code >= 300 && code < 400 ? "#5BC0DE"
+                : code >= 400 && code < 600 ? "#D9534F" : "#7A7A7A";
+        statusLabel.setText(String.format(
+                "<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span><font color='gray'> &nbsp; %d ms</font></html>",
+                color, code, message, response.getTimeTakenMs()));
+        isUpdatingUI = true;
+        try {
+            responseLanguageCombo.setSelectedItem(format);
+        } finally {
+            isUpdatingUI = false;
+        }
+        ApplicationManager.getApplication().runWriteAction(() -> responseBodyEditor.getDocument().setText(body));
+        responseHeadersArea.setText(headers);
+        sendBtn.setEnabled(true);
+    }
+
+    private void applyFailedResponse(EndpointModel endpoint, String message, boolean showInUi) {
+        endpoint.setLastResponseStatusCode(0);
+        endpoint.setLastResponseStatusMessage(message);
+        endpoint.setLastResponseTimeTakenMs(0);
+        endpoint.setLastResponseBody(message);
+        endpoint.setLastResponseHeaders("");
+        endpoint.setLastResponseFormat("TEXT");
+        saveEndpointState(endpoint);
+        if (!showInUi) return;
+        statusLabel.setText(message);
+        ApplicationManager.getApplication().runWriteAction(() -> responseBodyEditor.getDocument().setText(message));
+        responseHeadersArea.setText("");
+        sendBtn.setEnabled(true);
+    }
+
+    private void saveEndpointState(EndpointModel endpoint) {
+        vn.io.codelearning.springapitester.state.SpringLensState state =
+                vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        if (state != null) state.saveEndpoint(endpoint);
+    }
+
+    private String detectResponseFormat(vn.io.codelearning.springapitester.client.HttpResponseModel response) {
+        String contentType = "";
+        if (response.getHeaders() != null) {
+            for (java.util.Map.Entry<String, java.util.List<String>> entry : response.getHeaders().entrySet()) {
+                if ("Content-Type".equalsIgnoreCase(entry.getKey()) && !entry.getValue().isEmpty()) {
+                    contentType = entry.getValue().get(0).toLowerCase();
+                    break;
+                }
+            }
+        }
+        if (contentType.contains("json")) return "JSON";
+        if (contentType.contains("html")) return "HTML";
+        if (contentType.contains("xml")) return "XML";
+        return "TEXT";
+    }
+
+    private String formatResponseHeaders(vn.io.codelearning.springapitester.client.HttpResponseModel response) {
+        StringBuilder result = new StringBuilder();
+        if (response.getHeaders() != null) {
+            response.getHeaders().forEach((key, values) ->
+                    values.forEach(value -> result.append(key).append(": ").append(value).append('\n')));
+        }
+        return result.toString();
+    }
+
+    private String rootMessage(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null) current = current.getCause();
+        return current.getMessage() != null ? current.getMessage() : current.getClass().getSimpleName();
     }
 
     private String getEffectiveBaseUrl(EndpointModel endpoint) {

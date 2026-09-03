@@ -89,6 +89,10 @@ public class HttpClientService {
      * disabled for loopback development hosts after the caller has obtained user consent.
      */
     public CompletableFuture<HttpResponseModel> executeAsync(Request request, boolean allowInsecureTls) {
+        return execute(request, allowInsecureTls).future();
+    }
+
+    public RequestHandle execute(Request request, boolean allowInsecureTls) {
         if (request == null) {
             throw new IllegalArgumentException("Request must not be null");
         }
@@ -104,7 +108,9 @@ public class HttpClientService {
         CompletableFuture<HttpResponseModel> future = new CompletableFuture<>();
         long startTime = System.currentTimeMillis();
 
-        client.newCall(request).enqueue(new Callback() {
+        Call call = client.newCall(request);
+        RequestHandle handle = new RequestHandle(call, future);
+        call.enqueue(new Callback() {
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
                 future.completeExceptionally(e);
@@ -133,7 +139,7 @@ public class HttpClientService {
             }
         });
 
-        return future;
+        return handle;
     }
 
     private OkHttpClient getUnsafeLocalClient() {
@@ -188,6 +194,29 @@ public class HttpClientService {
             return gson.toJson(el);
         } catch (Exception e) {
             return rawJson;
+        }
+    }
+
+    public static final class RequestHandle {
+        private final Call call;
+        private final CompletableFuture<HttpResponseModel> future;
+
+        RequestHandle(Call call, CompletableFuture<HttpResponseModel> future) {
+            this.call = call;
+            this.future = future;
+        }
+
+        public CompletableFuture<HttpResponseModel> future() {
+            return future;
+        }
+
+        public void cancel() {
+            call.cancel();
+            future.cancel(false);
+        }
+
+        public boolean isCanceled() {
+            return call.isCanceled() || future.isCancelled();
         }
     }
 }

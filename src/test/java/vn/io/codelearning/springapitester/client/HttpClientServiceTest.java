@@ -1,6 +1,7 @@
 package vn.io.codelearning.springapitester.client;
 
 import okhttp3.Request;
+import okhttp3.OkHttpClient;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -28,5 +29,19 @@ public class HttpClientServiceTest {
                 () -> HttpClientService.getInstance().executeAsync(request, true)
         );
         Assert.assertTrue(error.getMessage().contains("localhost"));
+    }
+
+    @Test
+    public void testRequestHandleCancelsCallAndFuture() {
+        okhttp3.Call call = new OkHttpClient().newCall(
+                new Request.Builder().url("http://localhost/cancel").build());
+        java.util.concurrent.CompletableFuture<HttpResponseModel> future = new java.util.concurrent.CompletableFuture<>();
+        HttpClientService.RequestHandle handle = new HttpClientService.RequestHandle(call, future);
+
+        handle.cancel();
+
+        Assert.assertTrue(call.isCanceled());
+        Assert.assertTrue(future.isCancelled());
+        Assert.assertTrue(handle.isCanceled());
     }
 }
