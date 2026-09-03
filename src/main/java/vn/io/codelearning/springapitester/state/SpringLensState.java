@@ -74,7 +74,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         this.gatewayModeEnabled = state.gatewayModeEnabled;
         this.persistRequestBodies = state.persistRequestBodies;
         this.persistResponseHistory = state.persistResponseHistory;
-        migrateLegacyCredentials();
+        this.needsCredentialMigration = true;
     }
 
     public String getEndpointKey(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
@@ -448,10 +448,30 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         saved.authConfig = CredentialStore.sanitizeAuth(authConfig);
     }
 
+    private boolean needsCredentialMigration = false;
+
     private void attachProject(Project project) {
         if (this.project == null) {
             this.project = project;
-            migrateLegacyCredentials();
+            drainFallbackToPasswordSafe();
+            if (needsCredentialMigration) {
+                migrateLegacyCredentials();
+                needsCredentialMigration = false;
+            }
+        }
+    }
+
+    private void drainFallbackToPasswordSafe() {
+        if (fallbackMemoryStore == null) return;
+        CredentialStore store = credentialStore();
+        if (store == null || store == fallbackMemoryStore) return;
+        for (EndpointSavedState saved : allSavedEndpoints()) {
+            if (saved.credentialId != null && !saved.credentialId.isBlank()) {
+                CredentialStore.StoredSecrets fromMemory = fallbackMemoryStore.load(saved.credentialId);
+                if (fromMemory != null) {
+                    store.save(saved.credentialId, fromMemory.authConfig, fromMemory.headerValues, fromMemory.parameterValues);
+                }
+            }
         }
     }
 
@@ -465,7 +485,9 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
 
     void attachCredentialStoreForTest(CredentialStore store) {
         this.credentialStoreOverride = store;
+        drainFallbackToPasswordSafe();
         migrateLegacyCredentials();
+        this.needsCredentialMigration = false;
     }
 
     private void storeCredentials(EndpointSavedState saved, AuthConfig authConfig,

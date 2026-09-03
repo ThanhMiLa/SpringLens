@@ -82,6 +82,35 @@ public class CredentialStoreTest {
         Assert.assertEquals("Bearer legacy-header", state.resolveHeaders(legacy).get(0).getValue());
     }
 
+    @Test
+    public void testLoadStateDoesNotMigrateBeforeProjectAttach() {
+        SpringLensState source = new SpringLensState();
+        EndpointSavedState legacy = new EndpointSavedState();
+        legacy.authConfig.setAuthType(AuthTypeEnum.BEARER_TOKEN);
+        legacy.authConfig.setBearerToken("legacy-token");
+        legacy.customHeaders.add(new HeaderItem("Authorization", "Bearer legacy-header"));
+        source.endpoints.put("GET /legacy", legacy);
+
+        SpringLensState target = new SpringLensState();
+        target.loadState(source);
+
+        // Before project attach, credentials MUST remain in serializable state fields so they aren't lost
+        EndpointSavedState loaded = target.endpoints.get("GET /legacy");
+        Assert.assertEquals("legacy-token", loaded.authConfig.getBearerToken());
+        Assert.assertEquals("Bearer legacy-header", loaded.customHeaders.get(0).getValue());
+
+        // Now attach store (simulating attachProject)
+        MemoryBackend backend = new MemoryBackend();
+        CredentialStore store = new CredentialStore("project", backend);
+        target.attachCredentialStoreForTest(store);
+
+        // After attach, migration must have run
+        Assert.assertEquals("", loaded.authConfig.getBearerToken());
+        Assert.assertEquals("", loaded.customHeaders.get(0).getValue());
+        Assert.assertEquals("legacy-token", target.resolveAuthConfig(loaded).getBearerToken());
+        Assert.assertEquals("Bearer legacy-header", target.resolveHeaders(loaded).get(0).getValue());
+    }
+
     private static final class MemoryBackend implements CredentialStore.Backend {
         private final Map<String, String> values = new HashMap<>();
 
