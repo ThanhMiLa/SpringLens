@@ -15,6 +15,7 @@ public class EndpointSavedState {
     public AuthConfig authConfig = new AuthConfig();
     public String requestBodyJson = "";
     public RequestBodyType bodyType = RequestBodyType.NONE;
+    public boolean allowInsecureTls = false;
     public boolean isSecuredOverride = false;
     public boolean hasSecuredOverride = false;
 

@@ -23,6 +23,7 @@ public class ResponseCachingTest {
         endpoint.setLastResponseTimeTakenMs(42);
         endpoint.setLastResponseHeaders("Content-Type: application/json\nSet-Cookie: sid=abc");
         endpoint.setLastResponseFormat("JSON");
+        endpoint.setAllowInsecureTls(true);
 
         Assert.assertEquals("{\"status\":\"success\",\"data\":[1,2,3]}", endpoint.getLastResponseBody());
         Assert.assertEquals(200, endpoint.getLastResponseStatusCode());
@@ -30,6 +31,7 @@ public class ResponseCachingTest {
         Assert.assertEquals(42, endpoint.getLastResponseTimeTakenMs());
         Assert.assertEquals("Content-Type: application/json\nSet-Cookie: sid=abc", endpoint.getLastResponseHeaders());
         Assert.assertEquals("JSON", endpoint.getLastResponseFormat());
+        Assert.assertTrue(endpoint.isAllowInsecureTls());
     }
 
     @Test
@@ -44,6 +46,7 @@ public class ResponseCachingTest {
         endpoint.setLastResponseTimeTakenMs(120);
         endpoint.setLastResponseHeaders("Content-Type: application/json");
         endpoint.setLastResponseFormat("JSON");
+        endpoint.setAllowInsecureTls(true);
 
         // Save to state
         state.saveEndpoint(endpoint);
@@ -58,6 +61,7 @@ public class ResponseCachingTest {
         Assert.assertEquals(120, saved.lastResponseTimeTakenMs);
         Assert.assertEquals("Content-Type: application/json", saved.lastResponseHeaders);
         Assert.assertEquals("JSON", saved.lastResponseFormat);
+        Assert.assertTrue(saved.allowInsecureTls);
 
         // Restore into a fresh endpoint model instance
         EndpointModel restoredEndpoint = new EndpointModel(HttpMethodEnum.POST, "/api/v1/users", "UserController", "com.example", "createUser");
@@ -70,6 +74,7 @@ public class ResponseCachingTest {
         Assert.assertEquals(120, restoredEndpoint.getLastResponseTimeTakenMs());
         Assert.assertEquals("Content-Type: application/json", restoredEndpoint.getLastResponseHeaders());
         Assert.assertEquals("JSON", restoredEndpoint.getLastResponseFormat());
+        Assert.assertTrue(restoredEndpoint.isAllowInsecureTls());
     }
 
     @Test

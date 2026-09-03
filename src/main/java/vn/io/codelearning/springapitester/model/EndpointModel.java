@@ -31,6 +31,7 @@ public class EndpointModel {
     private AuthConfig authConfig;
     private String moduleName;            // Service chứa endpoint
     private String directBaseUrl;         // URL gọi trực tiếp (http://localhost:8081)
+    private boolean allowInsecureTls = false;
 
     // Cached Response fields
     private String lastResponseBody = "";
@@ -297,6 +298,14 @@ public class EndpointModel {
 
     public void setDirectBaseUrl(String directBaseUrl) {
         this.directBaseUrl = directBaseUrl;
+    }
+
+    public boolean isAllowInsecureTls() {
+        return allowInsecureTls;
+    }
+
+    public void setAllowInsecureTls(boolean allowInsecureTls) {
+        this.allowInsecureTls = allowInsecureTls;
     }
 
     public String getLastResponseBody() {

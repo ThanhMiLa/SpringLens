@@ -40,6 +40,9 @@ public class EndpointModelTest {
         Assert.assertEquals("[POST] /api/v1/users", endpoint.getDisplayName());
         Assert.assertEquals(HttpMethodEnum.POST, endpoint.getHttpMethod());
         Assert.assertEquals("/api/v1/users", endpoint.getPath());
+        Assert.assertFalse(endpoint.isAllowInsecureTls());
+        endpoint.setAllowInsecureTls(true);
+        Assert.assertTrue(endpoint.isAllowInsecureTls());
 
         // Add params
         endpoint.addParameter(new ParameterModel("userId", ParamTypeEnum.PATH_VARIABLE, "Long"));

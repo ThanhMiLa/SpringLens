@@ -269,6 +269,7 @@ public class EndpointTreePanel extends JPanel {
                         manualEp.setCustomHeaders(savedEp.customHeaders);
                         manualEp.setRequestBodyJson(savedEp.requestBodyJson);
                         manualEp.setBodyType(savedEp.bodyType);
+                        manualEp.setAllowInsecureTls(savedEp.allowInsecureTls);
                         if (savedEp.manualParameters != null) {
                             manualEp.getParameters().addAll(savedEp.manualParameters);
                         }

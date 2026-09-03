@@ -56,6 +56,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         saved.customHeaders = new java.util.ArrayList<>(endpoint.getCustomHeaders());
         saved.requestBodyJson = endpoint.getRequestBodyJson();
         saved.bodyType = endpoint.getBodyType();
+        saved.allowInsecureTls = endpoint.isAllowInsecureTls();
         saved.isSecuredOverride = endpoint.isSecured();
         
         // Response Cache
@@ -121,6 +122,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         
         // Restore Body Type and Security
         endpoint.setBodyType(saved.bodyType);
+        endpoint.setAllowInsecureTls(saved.allowInsecureTls);
         if (saved.hasSecuredOverride) {
             endpoint.setSecured(saved.isSecuredOverride);
         }

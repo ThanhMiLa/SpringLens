@@ -11,6 +11,7 @@ import javax.net.ssl.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -21,7 +22,8 @@ public class HttpClientService {
 
     private static HttpClientService instance;
 
-    private final OkHttpClient client;
+    private final OkHttpClient secureClient;
+    private volatile OkHttpClient unsafeLocalClient;
     private final Gson gson;
 
     private final InMemoryCookieJar cookieJar;
@@ -29,12 +31,7 @@ public class HttpClientService {
     private HttpClientService() {
         this.cookieJar = new InMemoryCookieJar();
         
-        X509TrustManager trustManager = createUnsafeTrustManager();
-        SSLSocketFactory sslSocketFactory = createUnsafeSslSocketFactory(trustManager);
-
-        this.client = new OkHttpClient.Builder()
-                .sslSocketFactory(sslSocketFactory, trustManager)
-                .hostnameVerifier((hostname, session) -> true)
+        this.secureClient = new OkHttpClient.Builder()
                 .cookieJar(cookieJar)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -84,6 +81,26 @@ public class HttpClientService {
      * Thực thi request bất đồng bộ, trả về CompletableFuture không làm đơ giao diện.
      */
     public CompletableFuture<HttpResponseModel> executeAsync(Request request) {
+        return executeAsync(request, false);
+    }
+
+    /**
+     * Executes a request with secure TLS by default. Certificate validation may only be
+     * disabled for loopback development hosts after the caller has obtained user consent.
+     */
+    public CompletableFuture<HttpResponseModel> executeAsync(Request request, boolean allowInsecureTls) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request must not be null");
+        }
+        OkHttpClient client = secureClient;
+        if (allowInsecureTls) {
+            String host = request.url().host();
+            if (!isLocalDevelopmentHost(host)) {
+                throw new IllegalArgumentException("Insecure TLS is only allowed for localhost or loopback addresses");
+            }
+            client = getUnsafeLocalClient();
+        }
+
         CompletableFuture<HttpResponseModel> future = new CompletableFuture<>();
         long startTime = System.currentTimeMillis();
 
@@ -117,6 +134,46 @@ public class HttpClientService {
         });
 
         return future;
+    }
+
+    private OkHttpClient getUnsafeLocalClient() {
+        OkHttpClient local = unsafeLocalClient;
+        if (local != null) return local;
+        synchronized (this) {
+            if (unsafeLocalClient == null) {
+                X509TrustManager trustManager = createUnsafeTrustManager();
+                unsafeLocalClient = secureClient.newBuilder()
+                        .sslSocketFactory(createUnsafeSslSocketFactory(trustManager), trustManager)
+                        .hostnameVerifier((hostname, session) -> isLocalDevelopmentHost(hostname))
+                        .build();
+            }
+            return unsafeLocalClient;
+        }
+    }
+
+    static boolean isLocalDevelopmentHost(String host) {
+        if (host == null || host.isBlank()) return false;
+        String normalized = host.trim().toLowerCase(Locale.ROOT);
+        if (normalized.endsWith(".")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return "localhost".equals(normalized)
+                || isIpv4Loopback(normalized)
+                || "::1".equals(normalized)
+                || "0:0:0:0:0:0:0:1".equals(normalized);
+    }
+
+    private static boolean isIpv4Loopback(String host) {
+        String[] parts = host.split("\\.", -1);
+        if (parts.length != 4 || !"127".equals(parts[0])) return false;
+        for (String part : parts) {
+            if (part.isEmpty() || part.length() > 3) return false;
+            for (int i = 0; i < part.length(); i++) {
+                if (!Character.isDigit(part.charAt(i))) return false;
+            }
+            if (Integer.parseInt(part) > 255) return false;
+        }
+        return true;
     }
 
     /**

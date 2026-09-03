@@ -27,6 +27,7 @@ public class EndpointDetailPanel extends JPanel {
     private final com.intellij.openapi.ui.ComboBox<vn.io.codelearning.springapitester.model.HttpMethodEnum> methodComboBox;
     private final JBTextField urlField;
     private final JButton sendBtn;
+    private final JCheckBox insecureTlsCheckBox;
 
     private final ParamTablePanel paramPanel;
     private ParamTablePanel formDataPanel;
@@ -218,6 +219,27 @@ public class EndpointDetailPanel extends JPanel {
         
         JPanel headerPanelWrap = new JPanel(new BorderLayout());
         headerPanelWrap.add(topBar, BorderLayout.CENTER);
+
+        insecureTlsCheckBox = new JCheckBox("Allow insecure TLS for localhost/loopback only");
+        insecureTlsCheckBox.setToolTipText("Trust self-signed certificates only for local development hosts");
+        insecureTlsCheckBox.addActionListener(e -> {
+            if (isUpdatingUI || currentEndpoint == null) return;
+            if (insecureTlsCheckBox.isSelected()) {
+                int choice = com.intellij.openapi.ui.Messages.showYesNoDialog(
+                        project,
+                        "This disables certificate validation for local requests and can expose credentials. Enable it only for a trusted development server.",
+                        "Enable Insecure Local TLS",
+                        "Enable",
+                        "Cancel",
+                        com.intellij.openapi.ui.Messages.getWarningIcon()
+                );
+                if (choice != com.intellij.openapi.ui.Messages.YES) {
+                    insecureTlsCheckBox.setSelected(false);
+                }
+            }
+            currentEndpoint.setAllowInsecureTls(insecureTlsCheckBox.isSelected());
+        });
+        headerPanelWrap.add(insecureTlsCheckBox, BorderLayout.SOUTH);
         
         add(headerPanelWrap, BorderLayout.NORTH);
 
@@ -426,6 +448,7 @@ public class EndpointDetailPanel extends JPanel {
                 headerPanel.setHeaders(new java.util.ArrayList<>());
                 authPanel.setAuthConfig(new vn.io.codelearning.springapitester.model.AuthConfig());
                 authPanel.setSecuredStatus(false);
+                insecureTlsCheckBox.setSelected(false);
                 ApplicationManager.getApplication().runWriteAction(() -> {
                     requestBodyEditor.getDocument().setText("");
                     responseBodyEditor.getDocument().setText("");
@@ -453,6 +476,7 @@ public class EndpointDetailPanel extends JPanel {
             headerPanel.setHeaders(endpoint.getCustomHeaders());
             authPanel.setAuthConfig(endpoint.getAuthConfig());
             authPanel.setSecuredStatus(endpoint.isSecured());
+            insecureTlsCheckBox.setSelected(endpoint.isAllowInsecureTls());
 
             String json = endpoint.getRequestBodyJson() != null ? endpoint.getRequestBodyJson() : "";
             
@@ -527,6 +551,7 @@ public class EndpointDetailPanel extends JPanel {
         currentEndpoint.setCustomHeaders(headerPanel.getHeaders());
         currentEndpoint.setAuthConfig(authPanel.getAuthConfig());
         currentEndpoint.setRequestBodyJson(requestBodyEditor.getDocument().getText());
+        currentEndpoint.setAllowInsecureTls(insecureTlsCheckBox.isSelected());
         
         // Tự động lưu trạng thái (State Persistence)
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
@@ -623,7 +648,7 @@ public class EndpointDetailPanel extends JPanel {
             try {
                 Request request = HttpRequestBuilder.buildRequest(currentEndpoint, fullUrl);
                 
-                HttpClientService.getInstance().executeAsync(request).thenAccept(response -> {
+                HttpClientService.getInstance().executeAsync(request, currentEndpoint.isAllowInsecureTls()).thenAccept(response -> {
                     ApplicationManager.getApplication().invokeLater(() -> {
                         int code = response.getStatusCode();
                         String colorHex = "#7A7A7A"; // Default gray
