@@ -93,6 +93,20 @@ public class SpringConfigResolutionService implements Disposable {
         SpringServerConfig cached = serverConfigCache.get(cacheKey);
         if (cached != null) return cached;
 
+        com.intellij.openapi.application.Application app = ApplicationManager.getApplication();
+        if (app != null && app.isDispatchThread()) {
+            SpringServerConfig fallback = new SpringServerConfig();
+            fallback.setFallback(true);
+            serverConfigCache.put(cacheKey, fallback);
+            app.executeOnPooledThread(() -> {
+                try {
+                    SpringServerConfig resolved = readServerConfigInternal(module);
+                    serverConfigCache.put(cacheKey, resolved);
+                } catch (Throwable ignored) {}
+            });
+            return fallback;
+        }
+
         SpringServerConfig config = readServerConfigInternal(module);
         serverConfigCache.put(cacheKey, config);
         return config;
@@ -102,6 +116,20 @@ public class SpringConfigResolutionService implements Disposable {
         String cacheKey = "__project__";
         GatewayConfig cached = gatewayConfigCache.get(cacheKey);
         if (cached != null) return cached;
+
+        com.intellij.openapi.application.Application app = ApplicationManager.getApplication();
+        if (app != null && app.isDispatchThread()) {
+            GatewayConfig fallback = new GatewayConfig();
+            fallback.isFallback = true;
+            gatewayConfigCache.put(cacheKey, fallback);
+            app.executeOnPooledThread(() -> {
+                try {
+                    GatewayConfig resolved = readGatewayConfigInternal();
+                    gatewayConfigCache.put(cacheKey, resolved);
+                } catch (Throwable ignored) {}
+            });
+            return fallback;
+        }
 
         GatewayConfig config = readGatewayConfigInternal();
         gatewayConfigCache.put(cacheKey, config);

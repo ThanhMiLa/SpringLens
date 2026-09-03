@@ -47,6 +47,14 @@ public class SpringEndpointScanner {
         Set<PsiClass> controllerClasses = findControllerClasses(project);
         List<vn.io.codelearning.springapitester.model.PublicSecurityRule> globalPublicRules = SecurityConfigScanner.scanForPublicRules(project);
 
+        SpringConfigResolutionService configService = SpringConfigResolutionService.getInstance(project);
+        if (configService != null) {
+            try {
+                configService.resolveServerConfig();
+                configService.resolveGatewayConfig();
+            } catch (Throwable ignored) {}
+        }
+
         for (PsiClass controllerClass : controllerClasses) {
             String packageName = extractPackageName(controllerClass);
             String controllerName = controllerClass.getName();

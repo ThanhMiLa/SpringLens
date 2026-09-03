@@ -143,16 +143,43 @@ public final class CredentialStore {
     }
 
     private static final class PasswordSafeBackend implements Backend {
+        private final Map<String, String> cache = new java.util.concurrent.ConcurrentHashMap<>();
+
         @Override
         public String get(String serviceName) {
-            Credentials credentials = PasswordSafe.getInstance().get(new CredentialAttributes(serviceName, "springlens"));
-            return credentials != null ? credentials.getPasswordAsString() : null;
+            String cached = cache.get(serviceName);
+            if (cached != null) return cached;
+            try {
+                Credentials credentials = PasswordSafe.getInstance().get(new CredentialAttributes(serviceName, "springlens"));
+                String val = credentials != null ? credentials.getPasswordAsString() : null;
+                if (val != null) cache.put(serviceName, val);
+                return val;
+            } catch (Throwable t) {
+                return null;
+            }
         }
 
         @Override
         public void set(String serviceName, String value) {
+            if (value == null) {
+                cache.remove(serviceName);
+            } else {
+                cache.put(serviceName, value);
+            }
             CredentialAttributes attributes = new CredentialAttributes(serviceName, "springlens");
-            PasswordSafe.getInstance().set(attributes, value != null ? new Credentials("springlens", value) : null);
+            Credentials credentials = value != null ? new Credentials("springlens", value) : null;
+            com.intellij.openapi.application.Application app = com.intellij.openapi.application.ApplicationManager.getApplication();
+            if (app != null && app.isDispatchThread()) {
+                app.executeOnPooledThread(() -> {
+                    try {
+                        PasswordSafe.getInstance().set(attributes, credentials);
+                    } catch (Throwable ignored) {}
+                });
+            } else {
+                try {
+                    PasswordSafe.getInstance().set(attributes, credentials);
+                } catch (Throwable ignored) {}
+            }
         }
     }
 }

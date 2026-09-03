@@ -112,19 +112,31 @@ public class ResponseCachingTest {
     }
 
     @Test
-    public void testSensitiveHistoryIsNotPersistedByDefault() {
+    public void testPersistenceDefaultAndDisabledBehavior() {
         SpringLensState state = new SpringLensState();
+        Assert.assertTrue(state.persistRequestBodies);
+        Assert.assertTrue(state.persistResponseHistory);
+
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/private", "PrivateController", "com.example", "create");
         endpoint.setRequestBodyJson("{\"password\":\"secret\"}");
         endpoint.setLastResponseBody("{\"token\":\"secret\"}");
         endpoint.setLastResponseHeaders("Authorization: Bearer secret\nSet-Cookie: sid=secret");
 
+        // By default, bodies and response history are persisted (with sensitive headers redacted)
         state.saveEndpoint(endpoint);
-        EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(endpoint));
+        EndpointSavedState savedDefault = state.endpoints.get(state.getEndpointKey(endpoint));
+        Assert.assertEquals("{\"password\":\"secret\"}", savedDefault.requestBodyJson);
+        Assert.assertEquals("{\"token\":\"[REDACTED]\"}", savedDefault.lastResponseBody);
+        Assert.assertEquals("Authorization: [REDACTED]\nSet-Cookie: [REDACTED]", savedDefault.lastResponseHeaders);
 
-        Assert.assertEquals("", saved.requestBodyJson);
-        Assert.assertEquals("", saved.lastResponseBody);
-        Assert.assertEquals("", saved.lastResponseHeaders);
+        // When explicitly disabled, bodies and response history are not persisted
+        state.persistRequestBodies = false;
+        state.persistResponseHistory = false;
+        state.saveEndpoint(endpoint);
+        EndpointSavedState savedDisabled = state.endpoints.get(state.getEndpointKey(endpoint));
+        Assert.assertEquals("", savedDisabled.requestBodyJson);
+        Assert.assertEquals("", savedDisabled.lastResponseBody);
+        Assert.assertEquals("", savedDisabled.lastResponseHeaders);
     }
 
     @Test

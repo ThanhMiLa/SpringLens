@@ -354,8 +354,8 @@ public class EndpointDetailPanel extends JPanel {
             persistRequestBodiesCheckBox.setSelected(privacyState.persistRequestBodies);
             persistResponseHistoryCheckBox.setSelected(privacyState.persistResponseHistory);
         }
-        persistRequestBodiesCheckBox.setToolTipText("Request bodies may contain sensitive data; disabled by default");
-        persistResponseHistoryCheckBox.setToolTipText("Response snapshots may contain sensitive data; disabled by default");
+        persistRequestBodiesCheckBox.setToolTipText("Persist request body across IDE restarts (enabled by default)");
+        persistResponseHistoryCheckBox.setToolTipText("Persist response history across IDE restarts (enabled by default)");
         persistRequestBodiesCheckBox.addActionListener(e -> {
             vn.io.codelearning.springapitester.state.SpringLensState state =
                     vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);

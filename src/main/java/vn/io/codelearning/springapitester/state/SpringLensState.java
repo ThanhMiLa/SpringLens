@@ -30,8 +30,8 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     public java.util.List<vn.io.codelearning.springapitester.model.FolderModel> manualFolders = new java.util.ArrayList<>();
     public java.util.List<EndpointSavedState> manualEndpoints = new java.util.ArrayList<>();
     public boolean gatewayModeEnabled = false;
-    public boolean persistRequestBodies = false;
-    public boolean persistResponseHistory = false;
+    public boolean persistRequestBodies = true;
+    public boolean persistResponseHistory = true;
     private transient Project project;
     private transient CredentialStore credentialStoreOverride;
 
