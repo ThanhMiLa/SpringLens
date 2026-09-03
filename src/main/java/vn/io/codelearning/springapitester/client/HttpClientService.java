@@ -125,13 +125,25 @@ public class HttpClientService {
                 // Sử dụng try-with-resources để đảm bảo responseBody luôn được close(), tránh rò rỉ bộ nhớ
                 try (ResponseBody responseBody = response.body()) {
                     long timeTaken = System.currentTimeMillis() - startTime;
+                    String contentType = response.header("Content-Type");
 
-                    String bodyStr = (responseBody != null) ? responseBody.string() : "";
+                    ResponseReader.ReadResult readResult = ResponseReader.readBody(
+                            responseBody, contentType, ResponseReader.DEFAULT_MAX_PREVIEW_BYTES);
 
                     HttpResponseModel model = new HttpResponseModel();
                     model.setStatusCode(response.code());
                     model.setStatusMessage(response.message());
-                    model.setBody(formatJson(bodyStr)); // Làm đẹp JSON
+                    model.setTruncated(readResult.isTruncated());
+                    model.setBinary(readResult.isBinary());
+                    model.setTotalBytes(readResult.getTotalBytes());
+                    model.setRawBytes(readResult.getRawBytes());
+                    model.setContentType(contentType);
+
+                    String bodyText = readResult.getText();
+                    if (!readResult.isBinary() && !readResult.isTruncated()) {
+                        bodyText = formatJson(bodyText);
+                    }
+                    model.setBody(bodyText);
                     // toMultimap() trả về Map<String, List<String>> giữ nguyên các header trùng lặp
                     model.setHeaders(response.headers().toMultimap()); 
                     model.setTimeTakenMs(timeTaken);
@@ -191,6 +203,9 @@ public class HttpClientService {
      */
     private String formatJson(String rawJson) {
         if (rawJson == null || rawJson.trim().isEmpty()) {
+            return rawJson;
+        }
+        if (rawJson.length() > ResponseReader.MAX_JSON_PRETTY_PRINT_CHARS) {
             return rawJson;
         }
         try {

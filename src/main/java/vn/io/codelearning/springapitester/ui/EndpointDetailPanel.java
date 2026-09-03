@@ -466,6 +466,11 @@ public class EndpointDetailPanel extends JPanel {
         responseLanguageCombo.addActionListener(e -> changeResponseLanguage());
         responseToolbar.add(new JLabel("Format: "));
         responseToolbar.add(responseLanguageCombo);
+
+        JButton saveResponseBtn = new JButton("Save to File...");
+        saveResponseBtn.setToolTipText("Save response body to a file");
+        saveResponseBtn.addActionListener(e -> onSaveResponseToFile());
+        responseToolbar.add(saveResponseBtn);
         statusBar.add(responseToolbar, BorderLayout.EAST);
 
         responseContainer.add(statusBar, BorderLayout.NORTH);
@@ -798,6 +803,29 @@ public class EndpointDetailPanel extends JPanel {
         });
     }
 
+    private byte[] lastResponseRawBytes;
+
+    private void onSaveResponseToFile() {
+        if (responseBodyEditor == null) return;
+        javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+        fileChooser.setDialogTitle("Save Response to File");
+        int userSelection = fileChooser.showSaveDialog(this);
+        if (userSelection == javax.swing.JFileChooser.APPROVE_OPTION) {
+            java.io.File fileToSave = fileChooser.getSelectedFile();
+            try {
+                if (lastResponseRawBytes != null && lastResponseRawBytes.length > 0) {
+                    java.nio.file.Files.write(fileToSave.toPath(), lastResponseRawBytes);
+                } else {
+                    String text = responseBodyEditor.getDocument().getText();
+                    java.nio.file.Files.writeString(fileToSave.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
+                }
+                com.intellij.openapi.ui.Messages.showInfoMessage(project, "Response saved to " + fileToSave.getAbsolutePath(), "Saved");
+            } catch (Exception ex) {
+                com.intellij.openapi.ui.Messages.showErrorDialog(project, "Failed to save file: " + ex.getMessage(), "Error");
+            }
+        }
+    }
+
     private void applySuccessfulResponse(EndpointModel endpoint,
                                          vn.io.codelearning.springapitester.client.HttpResponseModel response,
                                          boolean showInUi) {
@@ -807,6 +835,7 @@ public class EndpointDetailPanel extends JPanel {
         String body = response.getBody() != null ? response.getBody() : "";
         String headers = formatResponseHeaders(response);
         String format = detectResponseFormat(response);
+        this.lastResponseRawBytes = response.getRawBytes();
 
         endpoint.setLastResponseStatusCode(code);
         endpoint.setLastResponseStatusMessage(message);
@@ -820,9 +849,18 @@ public class EndpointDetailPanel extends JPanel {
         String color = code >= 200 && code < 300 ? "#5CB85C"
                 : code >= 300 && code < 400 ? "#5BC0DE"
                 : code >= 400 && code < 600 ? "#D9534F" : "#7A7A7A";
+        
+        StringBuilder badge = new StringBuilder();
+        if (response.isTruncated()) {
+            badge.append("&nbsp;<span style='background-color: #F0AD4E; color: white;'>&nbsp;<b>Truncated</b>&nbsp;</span>");
+        }
+        if (response.isBinary()) {
+            badge.append("&nbsp;<span style='background-color: #5BC0DE; color: white;'>&nbsp;<b>Binary</b>&nbsp;</span>");
+        }
+
         statusLabel.setText(String.format(
-                "<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span><font color='gray'> &nbsp; %d ms</font></html>",
-                color, code, message, response.getTimeTakenMs()));
+                "<html><span style='background-color: %s; color: white;'>&nbsp;<b>%d %s</b>&nbsp;</span>%s<font color='gray'> &nbsp; %d ms</font></html>",
+                color, code, message, badge.toString(), response.getTimeTakenMs()));
         isUpdatingUI = true;
         try {
             responseLanguageCombo.setSelectedItem(format);
@@ -856,6 +894,7 @@ public class EndpointDetailPanel extends JPanel {
     }
 
     private String detectResponseFormat(vn.io.codelearning.springapitester.client.HttpResponseModel response) {
+        if (response.isBinary()) return "TEXT";
         String contentType = "";
         if (response.getHeaders() != null) {
             for (java.util.Map.Entry<String, java.util.List<String>> entry : response.getHeaders().entrySet()) {
@@ -874,8 +913,13 @@ public class EndpointDetailPanel extends JPanel {
     private String formatResponseHeaders(vn.io.codelearning.springapitester.client.HttpResponseModel response) {
         StringBuilder result = new StringBuilder();
         if (response.getHeaders() != null) {
-            response.getHeaders().forEach((key, values) ->
-                    values.forEach(value -> result.append(key).append(": ").append(value).append('\n')));
+            response.getHeaders().forEach((key, values) -> {
+                boolean sensitive = vn.io.codelearning.springapitester.state.CredentialStore.isSensitiveHeader(key);
+                values.forEach(value -> {
+                    String displayVal = sensitive ? "[REDACTED]" : value;
+                    result.append(key).append(": ").append(displayVal).append('\n');
+                });
+            });
         }
         return result.toString();
     }

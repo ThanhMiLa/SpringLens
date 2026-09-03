@@ -91,7 +91,16 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         
         // Response Cache
         if (persistResponseHistory) {
-            saved.lastResponseBody = endpoint.getLastResponseBody();
+            String rawBody = endpoint.getLastResponseBody();
+            if (rawBody != null && rawBody.length() > MAX_PERSISTED_BODY_BYTES) {
+                byte[] rawBytes = rawBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                int safeBoundary = vn.io.codelearning.springapitester.client.ResponseReader.findSafeUtf8Boundary(
+                        rawBytes, Math.min(rawBytes.length, MAX_PERSISTED_BODY_BYTES));
+                saved.lastResponseBody = new String(rawBytes, 0, safeBoundary, java.nio.charset.StandardCharsets.UTF_8)
+                        + "\n\n--- [Persisted snapshot truncated at 256 KB] ---";
+            } else {
+                saved.lastResponseBody = rawBody != null ? rawBody : "";
+            }
             saved.lastResponseStatusCode = endpoint.getLastResponseStatusCode();
             saved.lastResponseStatusMessage = endpoint.getLastResponseStatusMessage();
             saved.lastResponseTimeTakenMs = endpoint.getLastResponseTimeTakenMs();
@@ -145,6 +154,30 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             endpoints.put(key, saved);
         } else {
             endpoints.put(key, saved);
+        }
+        enforceResponseStorageQuota();
+    }
+
+    public static final int MAX_PERSISTED_BODY_BYTES = 256 * 1024; // 256 KB
+    public static final int MAX_TOTAL_RESPONSE_STORAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+    private void enforceResponseStorageQuota() {
+        long totalBytes = 0;
+        for (EndpointSavedState s : endpoints.values()) {
+            if (s.lastResponseBody != null) {
+                totalBytes += s.lastResponseBody.length();
+            }
+        }
+        if (totalBytes > MAX_TOTAL_RESPONSE_STORAGE_BYTES) {
+            for (EndpointSavedState s : endpoints.values()) {
+                if (s.lastResponseBody != null && !s.lastResponseBody.isEmpty()) {
+                    totalBytes -= s.lastResponseBody.length();
+                    s.lastResponseBody = "";
+                    if (totalBytes <= MAX_TOTAL_RESPONSE_STORAGE_BYTES) {
+                        break;
+                    }
+                }
+            }
         }
     }
 

@@ -13,6 +13,11 @@ public class HttpResponseModel {
     // Dùng List<String> để giữ nguyên các header bị trùng tên (vd: Set-Cookie)
     private Map<String, List<String>> headers;
     private long timeTakenMs;
+    private boolean isTruncated = false;
+    private boolean isBinary = false;
+    private long totalBytes = 0;
+    private byte[] rawBytes;
+    private String contentType;
 
     public HttpResponseModel() {
     }
@@ -39,4 +44,19 @@ public class HttpResponseModel {
 
     public long getTimeTakenMs() { return timeTakenMs; }
     public void setTimeTakenMs(long timeTakenMs) { this.timeTakenMs = timeTakenMs; }
+
+    public boolean isTruncated() { return isTruncated; }
+    public void setTruncated(boolean truncated) { isTruncated = truncated; }
+
+    public boolean isBinary() { return isBinary; }
+    public void setBinary(boolean binary) { isBinary = binary; }
+
+    public long getTotalBytes() { return totalBytes; }
+    public void setTotalBytes(long totalBytes) { this.totalBytes = totalBytes; }
+
+    public byte[] getRawBytes() { return rawBytes; }
+    public void setRawBytes(byte[] rawBytes) { this.rawBytes = rawBytes; }
+
+    public String getContentType() { return contentType; }
+    public void setContentType(String contentType) { this.contentType = contentType; }
 }
