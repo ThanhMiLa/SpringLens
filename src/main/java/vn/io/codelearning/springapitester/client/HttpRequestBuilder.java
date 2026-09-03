@@ -177,16 +177,12 @@ public class HttpRequestBuilder {
                                     throw new IllegalArgumentException("Missing required file for parameter: " + key);
                                 }
                                 for (java.io.File file : files) {
-                                    if (!file.exists()) {
-                                        throw new IllegalArgumentException("File not found: " + file.getPath() + " for parameter: " + key);
-                                    }
-                                    if (file.isDirectory()) {
-                                        throw new IllegalArgumentException("Path is a directory, not a file: " + file.getPath() + " for parameter: " + key);
-                                    }
                                     String mime = RequestValidationUtil.detectMimeType(file);
+                                    MultipartPartModel part = new MultipartPartModel(key, file, mime);
+                                    part.validate();
                                     RequestBody fileBody = RequestBody.create(file, MediaType.parse(mime));
                                     multipartBuilder.addFormDataPart(key, file.getName(), fileBody);
-                                    multipartParts.add(new MultipartPartModel(key, file, mime));
+                                    multipartParts.add(part);
                                     hasData = true;
                                 }
                             } else {

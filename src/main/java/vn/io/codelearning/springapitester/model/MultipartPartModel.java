@@ -8,6 +8,7 @@ import java.io.File;
 public final class MultipartPartModel {
 
     public static final long LARGE_FILE_THRESHOLD_BYTES = 50L * 1024 * 1024; // 50 MB
+    public static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024; // 100 MB max supported file upload
 
     private final String name;
     private final String textValue;
@@ -89,6 +90,13 @@ public final class MultipartPartModel {
             }
             if (file.isDirectory()) {
                 throw new IllegalArgumentException("Path is a directory, not a file: " + file.getPath() + " for part: " + name);
+            }
+            if (!file.canRead()) {
+                throw new IllegalArgumentException("File cannot be read (permission denied): " + file.getPath() + " for part: " + name);
+            }
+            if (file.length() > MAX_FILE_SIZE_BYTES) {
+                throw new IllegalArgumentException("File size (" + (file.length() / (1024 * 1024)) +
+                        " MB) exceeds maximum allowed upload size of 100 MB: " + file.getPath());
             }
         }
     }
