@@ -128,29 +128,8 @@ public class HttpClientService implements Disposable {
         return execute(request, (InsecureTlsConsent) null).future();
     }
 
-    /**
-     * @deprecated Use {@link #executeAsync(Request, InsecureTlsConsent)} instead.
-     * Passing a boolean bypasses the explicit user consent dialog.
-     */
-    @Deprecated(forRemoval = true)
-    public CompletableFuture<HttpResponseModel> executeAsync(Request request, boolean allowInsecureTls) {
-        return execute(request, allowInsecureTls).future();
-    }
-
     public CompletableFuture<HttpResponseModel> executeAsync(Request request, InsecureTlsConsent consent) {
         return execute(request, consent).future();
-    }
-
-    /**
-     * @deprecated Use {@link #execute(Request, InsecureTlsConsent)} instead.
-     * Passing a boolean bypasses the explicit user consent dialog.
-     */
-    @Deprecated(forRemoval = true)
-    public RequestHandle execute(Request request, boolean allowInsecureTls) {
-        InsecureTlsConsent consent = allowInsecureTls && request != null
-                ? new InsecureTlsConsent(request.url().host())
-                : null;
-        return execute(request, consent);
     }
 
     public RequestHandle execute(Request request, InsecureTlsConsent consent) {
