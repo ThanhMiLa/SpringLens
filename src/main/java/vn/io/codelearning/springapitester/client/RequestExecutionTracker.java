@@ -58,6 +58,13 @@ public final class RequestExecutionTracker {
         }
     }
 
+    public void removeCompleted(RequestExecutionContext context) {
+        if (context == null || !context.isTerminal()) return;
+        String key = context.getEndpointIdentity().getKey();
+        activeContexts.remove(key, context);
+        latestSequenceByEndpoint.remove(key, context.getSequence());
+    }
+
     public void cancel(EndpointModel endpoint) {
         if (endpoint == null) return;
         String key = EndpointIdentity.fromEndpoint(endpoint).getKey();

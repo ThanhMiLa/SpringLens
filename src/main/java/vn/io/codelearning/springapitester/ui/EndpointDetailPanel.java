@@ -13,6 +13,7 @@ import okhttp3.Request;
 import vn.io.codelearning.springapitester.client.HttpClientService;
 import vn.io.codelearning.springapitester.client.HttpRequestBuilder;
 import vn.io.codelearning.springapitester.generator.DtoJsonGenerator;
+import vn.io.codelearning.springapitester.model.EndpointIdentity;
 import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.model.ParameterModel;
 import vn.io.codelearning.springapitester.model.ParamTypeEnum;
@@ -889,63 +890,71 @@ public class EndpointDetailPanel extends JPanel {
                     activeRequests.remove(handle);
                     if (disposed || project.isDisposed()) {
                         context.dispose();
+                        requestTracker.removeCompleted(context);
                         return;
                     }
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (disposed || project.isDisposed()) {
                             context.dispose();
+                            requestTracker.removeCompleted(context);
                             return;
                         }
-                        // Atomically update target endpoint model
-                        if (error == null) {
-                            applySuccessfulResponse(requestEndpoint, response, false);
-                        } else {
-                            applyFailedResponse(requestEndpoint, "Error: " + rootMessage(error), false);
-                        }
 
-                        vn.io.codelearning.springapitester.model.EndpointIdentity currentIdentity = currentEndpoint != null
-                                ? vn.io.codelearning.springapitester.model.EndpointIdentity.fromEndpoint(currentEndpoint) : null;
+                        boolean isStillValid = !context.isTerminal();
+                        EndpointIdentity currentIdentity = currentEndpoint != null
+                                ? EndpointIdentity.fromEndpoint(currentEndpoint) : null;
                         long visibleGen = uiGenerationCounter.get();
-                        boolean canRender = context.canRenderToUi(currentIdentity, visibleGen);
+                        boolean canRender = isStillValid && context.canRenderToUi(currentIdentity, visibleGen);
 
-                        if (canRender) {
+                        if (isStillValid) {
                             if (error == null) {
                                 context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.SUCCESS);
-                                applySuccessfulResponse(requestEndpoint, response, true);
+                                applySuccessfulResponse(requestEndpoint, response, canRender);
                             } else {
                                 context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
-                                applyFailedResponse(requestEndpoint, "Error: " + rootMessage(error), true);
+                                applyFailedResponse(requestEndpoint, "Error: " + rootMessage(error), canRender);
                             }
-                            sendBtn.setText("Send");
                         } else {
                             context.transitionToTerminal(error == null
                                     ? vn.io.codelearning.springapitester.client.RequestExecutionState.SUCCESS
                                     : vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
                         }
+
+                        if (canRender) {
+                            sendBtn.setText("Send");
+                        }
+                        requestTracker.removeCompleted(context);
                     });
                 });
             } catch (Exception error) {
                 if (disposed || project.isDisposed()) {
                     context.dispose();
+                    requestTracker.removeCompleted(context);
                     return;
                 }
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (disposed || project.isDisposed()) {
                         context.dispose();
+                        requestTracker.removeCompleted(context);
                         return;
                     }
-                    applyFailedResponse(requestEndpoint, "Failed to build request: " + rootMessage(error), false);
-                    vn.io.codelearning.springapitester.model.EndpointIdentity currentIdentity = currentEndpoint != null
-                            ? vn.io.codelearning.springapitester.model.EndpointIdentity.fromEndpoint(currentEndpoint) : null;
+                    boolean isStillValid = !context.isTerminal();
+                    EndpointIdentity currentIdentity = currentEndpoint != null
+                            ? EndpointIdentity.fromEndpoint(currentEndpoint) : null;
                     long visibleGen = uiGenerationCounter.get();
-                    boolean canRender = context.canRenderToUi(currentIdentity, visibleGen);
-                    if (canRender) {
+                    boolean canRender = isStillValid && context.canRenderToUi(currentIdentity, visibleGen);
+
+                    if (isStillValid) {
                         context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
-                        applyFailedResponse(requestEndpoint, "Failed to build request: " + rootMessage(error), true);
-                        sendBtn.setText("Send");
+                        applyFailedResponse(requestEndpoint, "Failed to build request: " + rootMessage(error), canRender);
                     } else {
                         context.transitionToTerminal(vn.io.codelearning.springapitester.client.RequestExecutionState.FAILED);
                     }
+
+                    if (canRender) {
+                        sendBtn.setText("Send");
+                    }
+                    requestTracker.removeCompleted(context);
                 });
             }
         });

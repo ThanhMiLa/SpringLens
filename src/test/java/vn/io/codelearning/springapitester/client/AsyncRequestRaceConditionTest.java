@@ -118,4 +118,44 @@ public class AsyncRequestRaceConditionTest {
         Assert.assertNull(tracker.getActiveContext(ep1));
         Assert.assertNull(tracker.getActiveContext(ep2));
     }
+
+    @Test
+    public void testRemoveCompletedContextCleansUpActiveContexts() {
+        RequestExecutionTracker tracker = new RequestExecutionTracker();
+        EndpointModel ep = new EndpointModel(HttpMethodEnum.GET, "/api/test", "TestCtrl", "com.example", "test");
+
+        RequestExecutionContext ctx = tracker.begin(ep, 1L);
+        Assert.assertNotNull(tracker.getActiveContext(ep));
+
+        // Attempting to remove non-terminal context is a no-op
+        tracker.removeCompleted(ctx);
+        Assert.assertNotNull(tracker.getActiveContext(ep));
+
+        // Once terminal (SUCCESS), removal succeeds
+        ctx.transitionToTerminal(RequestExecutionState.SUCCESS);
+        tracker.removeCompleted(ctx);
+        Assert.assertNull(tracker.getActiveContext(ep));
+    }
+
+    @Test
+    public void testSupersededRequestDoesNotRemoveNewerContext() {
+        RequestExecutionTracker tracker = new RequestExecutionTracker();
+        EndpointModel ep = new EndpointModel(HttpMethodEnum.GET, "/api/test", "TestCtrl", "com.example", "test");
+
+        RequestExecutionContext ctx1 = tracker.begin(ep, 1L);
+        RequestExecutionContext ctx2 = tracker.begin(ep, 1L);
+
+        Assert.assertEquals(RequestExecutionState.SUPERSEDED, ctx1.getState());
+        Assert.assertEquals(RequestExecutionState.IN_FLIGHT, ctx2.getState());
+        Assert.assertSame(ctx2, tracker.getActiveContext(ep));
+
+        // When ctx1 attempts removeCompleted, it should NOT remove ctx2
+        tracker.removeCompleted(ctx1);
+        Assert.assertSame(ctx2, tracker.getActiveContext(ep));
+
+        // When ctx2 finishes, it is removed
+        ctx2.transitionToTerminal(RequestExecutionState.SUCCESS);
+        tracker.removeCompleted(ctx2);
+        Assert.assertNull(tracker.getActiveContext(ep));
+    }
 }
