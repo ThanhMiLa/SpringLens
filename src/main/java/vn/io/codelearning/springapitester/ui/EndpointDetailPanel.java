@@ -28,6 +28,8 @@ public class EndpointDetailPanel extends JPanel {
     private final JBTextField urlField;
     private final JButton sendBtn;
     private final JCheckBox insecureTlsCheckBox;
+    private final JCheckBox persistRequestBodiesCheckBox;
+    private final JCheckBox persistResponseHistoryCheckBox;
 
     private final ParamTablePanel paramPanel;
     private ParamTablePanel formDataPanel;
@@ -239,7 +241,31 @@ public class EndpointDetailPanel extends JPanel {
             }
             currentEndpoint.setAllowInsecureTls(insecureTlsCheckBox.isSelected());
         });
-        headerPanelWrap.add(insecureTlsCheckBox, BorderLayout.SOUTH);
+        JPanel privacyOptions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        privacyOptions.add(insecureTlsCheckBox);
+        persistRequestBodiesCheckBox = new JCheckBox("Persist request bodies");
+        persistResponseHistoryCheckBox = new JCheckBox("Persist response history");
+        vn.io.codelearning.springapitester.state.SpringLensState privacyState =
+                vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        if (privacyState != null) {
+            persistRequestBodiesCheckBox.setSelected(privacyState.persistRequestBodies);
+            persistResponseHistoryCheckBox.setSelected(privacyState.persistResponseHistory);
+        }
+        persistRequestBodiesCheckBox.setToolTipText("Request bodies may contain sensitive data; disabled by default");
+        persistResponseHistoryCheckBox.setToolTipText("Response snapshots may contain sensitive data; disabled by default");
+        persistRequestBodiesCheckBox.addActionListener(e -> {
+            vn.io.codelearning.springapitester.state.SpringLensState state =
+                    vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+            if (state != null) state.persistRequestBodies = persistRequestBodiesCheckBox.isSelected();
+        });
+        persistResponseHistoryCheckBox.addActionListener(e -> {
+            vn.io.codelearning.springapitester.state.SpringLensState state =
+                    vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+            if (state != null) state.persistResponseHistory = persistResponseHistoryCheckBox.isSelected();
+        });
+        privacyOptions.add(persistRequestBodiesCheckBox);
+        privacyOptions.add(persistResponseHistoryCheckBox);
+        headerPanelWrap.add(privacyOptions, BorderLayout.SOUTH);
         
         add(headerPanelWrap, BorderLayout.NORTH);
 

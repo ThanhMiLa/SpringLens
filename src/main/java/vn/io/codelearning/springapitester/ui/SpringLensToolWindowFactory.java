@@ -90,10 +90,10 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                 }
                 // Apply to all stored endpoints in state
                 for (vn.io.codelearning.springapitester.state.EndpointSavedState storedEp : state.endpoints.values()) {
-                    storedEp.authConfig = authConfig.cloneConfig();
+                    state.updateSavedAuthConfig(storedEp, authConfig);
                 }
                 for (vn.io.codelearning.springapitester.state.EndpointSavedState storedManualEp : state.manualEndpoints) {
-                    storedManualEp.authConfig = authConfig.cloneConfig();
+                    state.updateSavedAuthConfig(storedManualEp, authConfig);
                 }
             }
         });

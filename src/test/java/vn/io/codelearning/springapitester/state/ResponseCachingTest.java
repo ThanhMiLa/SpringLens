@@ -37,6 +37,8 @@ public class ResponseCachingTest {
     @Test
     public void testSpringLensStateSaveAndRestoreScannedEndpointResponse() {
         SpringLensState state = new SpringLensState();
+        state.persistRequestBodies = true;
+        state.persistResponseHistory = true;
 
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/v1/users", "UserController", "com.example", "createUser");
         endpoint.setRequestBodyJson("{\"name\":\"Alice\"}");
@@ -80,6 +82,7 @@ public class ResponseCachingTest {
     @Test
     public void testSpringLensStateSaveAndRestoreManualEndpointResponse() {
         SpringLensState state = new SpringLensState();
+        state.persistResponseHistory = true;
 
         EndpointModel manualEp = new EndpointModel();
         manualEp.setId("manual-uuid-1");
@@ -106,5 +109,30 @@ public class ResponseCachingTest {
         Assert.assertEquals(15, savedManual.lastResponseTimeTakenMs);
         Assert.assertEquals("Content-Type: application/json", savedManual.lastResponseHeaders);
         Assert.assertEquals("JSON", savedManual.lastResponseFormat);
+    }
+
+    @Test
+    public void testSensitiveHistoryIsNotPersistedByDefault() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/private", "PrivateController", "com.example", "create");
+        endpoint.setRequestBodyJson("{\"password\":\"secret\"}");
+        endpoint.setLastResponseBody("{\"token\":\"secret\"}");
+        endpoint.setLastResponseHeaders("Authorization: Bearer secret\nSet-Cookie: sid=secret");
+
+        state.saveEndpoint(endpoint);
+        EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(endpoint));
+
+        Assert.assertEquals("", saved.requestBodyJson);
+        Assert.assertEquals("", saved.lastResponseBody);
+        Assert.assertEquals("", saved.lastResponseHeaders);
+    }
+
+    @Test
+    public void testSensitiveResponseHeadersAreRedacted() {
+        Assert.assertEquals(
+                "Content-Type: application/json\nAuthorization: [REDACTED]\nSet-Cookie: [REDACTED]",
+                SpringLensState.redactResponseHeaders(
+                        "Content-Type: application/json\nAuthorization: Bearer secret\nSet-Cookie: sid=secret")
+        );
     }
 }

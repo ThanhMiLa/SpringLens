@@ -6,9 +6,12 @@ import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import vn.io.codelearning.springapitester.model.AuthConfig;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @State(
     name = "SpringLensState",
@@ -22,9 +25,15 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     public java.util.List<vn.io.codelearning.springapitester.model.FolderModel> manualFolders = new java.util.ArrayList<>();
     public java.util.List<EndpointSavedState> manualEndpoints = new java.util.ArrayList<>();
     public boolean gatewayModeEnabled = false;
+    public boolean persistRequestBodies = false;
+    public boolean persistResponseHistory = false;
+    private transient Project project;
+    private transient CredentialStore credentialStoreOverride;
 
     public static SpringLensState getInstance(Project project) {
-        return project.getService(SpringLensState.class);
+        SpringLensState state = project.getService(SpringLensState.class);
+        if (state != null) state.attachProject(project);
+        return state;
     }
 
     @Nullable
@@ -35,7 +44,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
 
     @Override
     public void loadState(@NotNull SpringLensState state) {
-        this.endpoints = state.endpoints;
+        this.endpoints = state.endpoints != null ? state.endpoints : new HashMap<>();
         if (state.manualFolders != null) {
             this.manualFolders = state.manualFolders;
         }
@@ -43,6 +52,9 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             this.manualEndpoints = state.manualEndpoints;
         }
         this.gatewayModeEnabled = state.gatewayModeEnabled;
+        this.persistRequestBodies = state.persistRequestBodies;
+        this.persistResponseHistory = state.persistResponseHistory;
+        migrateLegacyCredentials();
     }
 
     public String getEndpointKey(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
@@ -52,23 +64,28 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
     public void saveEndpoint(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
         if (endpoint == null) return;
         EndpointSavedState saved = new EndpointSavedState();
-        saved.authConfig = endpoint.getAuthConfig();
-        saved.customHeaders = new java.util.ArrayList<>(endpoint.getCustomHeaders());
-        saved.requestBodyJson = endpoint.getRequestBodyJson();
+        EndpointSavedState oldSaved = endpoint.isManual()
+                ? manualEndpoints.stream().filter(e -> e.id != null && e.id.equals(endpoint.getId())).findFirst().orElse(null)
+                : endpoints.get(getEndpointKey(endpoint));
+        saved.credentialId = oldSaved != null && oldSaved.credentialId != null && !oldSaved.credentialId.isBlank()
+                ? oldSaved.credentialId : UUID.randomUUID().toString();
+        storeCredentials(saved, endpoint.getAuthConfig(), endpoint.getCustomHeaders());
+        saved.requestBodyJson = persistRequestBodies ? endpoint.getRequestBodyJson() : "";
         saved.bodyType = endpoint.getBodyType();
         saved.allowInsecureTls = endpoint.isAllowInsecureTls();
         saved.isSecuredOverride = endpoint.isSecured();
         
         // Response Cache
-        saved.lastResponseBody = endpoint.getLastResponseBody();
-        saved.lastResponseStatusCode = endpoint.getLastResponseStatusCode();
-        saved.lastResponseStatusMessage = endpoint.getLastResponseStatusMessage();
-        saved.lastResponseTimeTakenMs = endpoint.getLastResponseTimeTakenMs();
-        saved.lastResponseHeaders = endpoint.getLastResponseHeaders();
-        saved.lastResponseFormat = endpoint.getLastResponseFormat();
+        if (persistResponseHistory) {
+            saved.lastResponseBody = endpoint.getLastResponseBody();
+            saved.lastResponseStatusCode = endpoint.getLastResponseStatusCode();
+            saved.lastResponseStatusMessage = endpoint.getLastResponseStatusMessage();
+            saved.lastResponseTimeTakenMs = endpoint.getLastResponseTimeTakenMs();
+            saved.lastResponseHeaders = redactResponseHeaders(endpoint.getLastResponseHeaders());
+            saved.lastResponseFormat = endpoint.getLastResponseFormat();
+        }
 
         // Inherit the previous override state so we don't accidentally lock all endpoints
-        EndpointSavedState oldSaved = endpoints.get(getEndpointKey(endpoint));
         if (oldSaved != null) {
             saved.hasSecuredOverride = oldSaved.hasSecuredOverride;
         } else {
@@ -112,8 +129,8 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         if (saved == null) return;
 
         // Restore Auth & Headers
-        endpoint.setAuthConfig(saved.authConfig);
-        endpoint.setCustomHeaders(saved.customHeaders);
+        endpoint.setAuthConfig(resolveAuthConfig(saved));
+        endpoint.setCustomHeaders(resolveHeaders(saved));
         
         // Restore JSON Body (User can use Sync Schema button later to smart merge with new DTO changes)
         if (saved.requestBodyJson != null) {
@@ -143,8 +160,99 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         endpoint.setLastResponseFormat(saved.lastResponseFormat);
     }
     public void clearAllData() {
+        CredentialStore store = credentialStore();
+        if (store != null) {
+            endpoints.values().forEach(saved -> store.delete(saved.credentialId));
+            manualEndpoints.forEach(saved -> store.delete(saved.credentialId));
+        }
         this.endpoints.clear();
         this.manualFolders.clear();
         this.manualEndpoints.clear();
+    }
+
+    public AuthConfig resolveAuthConfig(EndpointSavedState saved) {
+        CredentialStore.StoredSecrets secrets = loadSecrets(saved);
+        return secrets != null && secrets.authConfig != null
+                ? secrets.authConfig.cloneConfig()
+                : CredentialStore.sanitizeAuth(saved.authConfig);
+    }
+
+    public List<vn.io.codelearning.springapitester.model.HeaderItem> resolveHeaders(EndpointSavedState saved) {
+        CredentialStore.StoredSecrets secrets = loadSecrets(saved);
+        return CredentialStore.restoreHeaders(saved.customHeaders, secrets != null ? secrets.headerValues : null);
+    }
+
+    public void updateSavedAuthConfig(EndpointSavedState saved, vn.io.codelearning.springapitester.model.AuthConfig authConfig) {
+        if (saved == null) return;
+        if (saved.credentialId == null || saved.credentialId.isBlank()) saved.credentialId = UUID.randomUUID().toString();
+        CredentialStore.StoredSecrets existing = loadSecrets(saved);
+        Map<Integer, String> headers = existing != null ? existing.headerValues : new HashMap<>();
+        CredentialStore store = credentialStore();
+        if (store != null) store.save(saved.credentialId, authConfig, headers);
+        saved.authConfig = CredentialStore.sanitizeAuth(authConfig);
+    }
+
+    private void attachProject(Project project) {
+        if (this.project == null) {
+            this.project = project;
+            migrateLegacyCredentials();
+        }
+    }
+
+    private CredentialStore credentialStore() {
+        if (credentialStoreOverride != null) return credentialStoreOverride;
+        return project != null && !project.isDisposed() ? new CredentialStore(project) : null;
+    }
+
+    void attachCredentialStoreForTest(CredentialStore store) {
+        this.credentialStoreOverride = store;
+        migrateLegacyCredentials();
+    }
+
+    private void storeCredentials(EndpointSavedState saved, AuthConfig authConfig,
+                                  List<vn.io.codelearning.springapitester.model.HeaderItem> headers) {
+        Map<Integer, String> headerSecrets = new HashMap<>();
+        saved.authConfig = CredentialStore.sanitizeAuth(authConfig);
+        saved.customHeaders = CredentialStore.sanitizeHeaders(headers, headerSecrets);
+        CredentialStore store = credentialStore();
+        if (store != null) store.save(saved.credentialId, authConfig, headerSecrets);
+    }
+
+    private CredentialStore.StoredSecrets loadSecrets(EndpointSavedState saved) {
+        CredentialStore store = credentialStore();
+        return store != null && saved != null ? store.load(saved.credentialId) : null;
+    }
+
+    private void migrateLegacyCredentials() {
+        CredentialStore store = credentialStore();
+        if (store == null) return;
+        for (EndpointSavedState saved : allSavedEndpoints()) {
+            if (CredentialStore.containsSecrets(saved.authConfig, saved.customHeaders)) {
+                if (saved.credentialId == null || saved.credentialId.isBlank()) saved.credentialId = UUID.randomUUID().toString();
+                storeCredentials(saved, saved.authConfig, saved.customHeaders);
+            }
+        }
+    }
+
+    private List<EndpointSavedState> allSavedEndpoints() {
+        List<EndpointSavedState> result = new java.util.ArrayList<>(endpoints.values());
+        result.addAll(manualEndpoints);
+        return result;
+    }
+
+    static String redactResponseHeaders(String headers) {
+        if (headers == null || headers.isBlank()) return headers != null ? headers : "";
+        StringBuilder result = new StringBuilder();
+        for (String line : headers.split("\\R", -1)) {
+            int separator = line.indexOf(':');
+            if (separator > 0 && CredentialStore.isSensitiveHeader(line.substring(0, separator))) {
+                result.append(line, 0, separator + 1).append(" [REDACTED]");
+            } else {
+                result.append(line);
+            }
+            result.append('\n');
+        }
+        if (!headers.endsWith("\n") && result.length() > 0) result.setLength(result.length() - 1);
+        return result.toString();
     }
 }

@@ -265,8 +265,8 @@ public class EndpointTreePanel extends JPanel {
                         manualEp.setFolderId(savedEp.folderId);
                         manualEp.setHttpMethod(savedEp.httpMethod);
                         manualEp.setPath(savedEp.path);
-                        manualEp.setAuthConfig(savedEp.authConfig);
-                        manualEp.setCustomHeaders(savedEp.customHeaders);
+                        manualEp.setAuthConfig(state.resolveAuthConfig(savedEp));
+                        manualEp.setCustomHeaders(state.resolveHeaders(savedEp));
                         manualEp.setRequestBodyJson(savedEp.requestBodyJson);
                         manualEp.setBodyType(savedEp.bodyType);
                         manualEp.setAllowInsecureTls(savedEp.allowInsecureTls);
