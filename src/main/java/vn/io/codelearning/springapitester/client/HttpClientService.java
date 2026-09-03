@@ -24,8 +24,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class HttpClientService implements Disposable {
 
-    private static volatile HttpClientService defaultInstance;
-
     private final Project project;
     private final OkHttpClient secureClient;
     private volatile OkHttpClient unsafeLocalClient;
@@ -52,19 +50,14 @@ public class HttpClientService implements Disposable {
     }
 
     public static HttpClientService getInstance(@NotNull Project project) {
-        HttpClientService service = project.getService(HttpClientService.class);
-        return service != null ? service : getInstance();
-    }
-
-    public static HttpClientService getInstance() {
-        if (defaultInstance == null) {
-            synchronized (HttpClientService.class) {
-                if (defaultInstance == null) {
-                    defaultInstance = new HttpClientService();
-                }
-            }
+        if (project == null) {
+            throw new IllegalArgumentException("Project must not be null for HttpClientService");
         }
-        return defaultInstance;
+        HttpClientService service = project.getService(HttpClientService.class);
+        if (service == null) {
+            throw new IllegalStateException("HttpClientService is not registered for project: " + project.getName());
+        }
+        return service;
     }
 
     public Project getProject() {

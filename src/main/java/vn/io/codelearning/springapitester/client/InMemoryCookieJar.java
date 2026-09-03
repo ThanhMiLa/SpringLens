@@ -23,7 +23,7 @@ public class InMemoryCookieJar implements CookieJar {
             // Xoá cookie cũ nếu trùng identity (name + domain + path)
             cookieStore.removeIf(oldCookie ->
                     oldCookie.name().equals(newCookie.name()) &&
-                    oldCookie.domain().equals(newCookie.domain()) &&
+                    oldCookie.domain().equalsIgnoreCase(newCookie.domain()) &&
                     oldCookie.path().equals(newCookie.path())
             );
 
@@ -54,5 +54,13 @@ public class InMemoryCookieJar implements CookieJar {
     
     public synchronized void clearAll() {
         cookieStore.clear();
+    }
+
+    public synchronized int size() {
+        return cookieStore.size();
+    }
+
+    public synchronized List<Cookie> getAllCookies() {
+        return new ArrayList<>(cookieStore);
     }
 }
