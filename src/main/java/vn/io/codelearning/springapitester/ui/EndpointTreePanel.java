@@ -80,6 +80,10 @@ public class EndpointTreePanel extends JPanel {
                 if (state != null) {
                     state.clearAllData(); // Then wipe everything, including the one we just saved
                 }
+                vn.io.codelearning.springapitester.client.HttpClientService http = vn.io.codelearning.springapitester.client.HttpClientService.getInstance(project);
+                if (http != null) {
+                    http.clearCookies();
+                }
                 // Xóa sạch danh sách hiển thị trên UI, không quét lại
                 updateEndpoints(new java.util.ArrayList<>());
             }

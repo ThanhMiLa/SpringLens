@@ -64,5 +64,6 @@
                     factoryClass="vn.io.codelearning.springapitester.ui.SpringLensToolWindowFactory"
                     icon="/icons/springlens.svg"/>
         <projectService serviceImplementation="vn.io.codelearning.springapitester.state.SpringLensState"/>
+        <projectService serviceImplementation="vn.io.codelearning.springapitester.client.HttpClientService"/>
     </extensions>
 </idea-plugin>

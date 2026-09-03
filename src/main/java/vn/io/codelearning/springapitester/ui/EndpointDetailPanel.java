@@ -433,6 +433,19 @@ public class EndpointDetailPanel extends JPanel {
         cookiesTabPanel.setBorder(BorderFactory.createTitledBorder("Cookie Values (@CookieValue)"));
         cookiesTabPanel.add(cookiePanel, BorderLayout.CENTER);
 
+        JPanel cookieToolbar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 2));
+        JButton clearCookiesBtn = new JButton("Clear Session Cookies");
+        clearCookiesBtn.setToolTipText("Clear in-memory session cookies for this project");
+        clearCookiesBtn.addActionListener(e -> {
+            HttpClientService http = HttpClientService.getInstance(project);
+            if (http != null) {
+                http.clearCookies();
+                com.intellij.openapi.ui.Messages.showInfoMessage(project, "Session cookies cleared for this project.", "Cookies Cleared");
+            }
+        });
+        cookieToolbar.add(clearCookiesBtn);
+        cookiesTabPanel.add(cookieToolbar, BorderLayout.SOUTH);
+
         requestTabs.addTab("Params", paramPanel);
         requestTabs.addTab("Headers", headersTabPanel);
         requestTabs.addTab("Cookies", cookiesTabPanel);
@@ -768,7 +781,7 @@ public class EndpointDetailPanel extends JPanel {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             try {
                 Request request = HttpRequestBuilder.buildRequest(requestEndpoint, fullUrl);
-                HttpClientService.RequestHandle handle = HttpClientService.getInstance()
+                HttpClientService.RequestHandle handle = HttpClientService.getInstance(project)
                         .execute(request, requestEndpoint.isAllowInsecureTls());
                 activeRequests.add(handle);
                 handle.future().whenComplete((response, error) -> {
