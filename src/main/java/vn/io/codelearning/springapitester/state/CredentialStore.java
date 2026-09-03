@@ -107,7 +107,7 @@ public final class CredentialStore {
         return false;
     }
 
-    static boolean isSensitiveHeader(String key) {
+    public static boolean isSensitiveHeader(String key) {
         if (key == null) return false;
         String normalized = key.trim().toLowerCase(Locale.ROOT);
         return normalized.equals("authorization")

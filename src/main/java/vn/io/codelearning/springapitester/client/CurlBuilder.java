@@ -1,190 +1,184 @@
 package vn.io.codelearning.springapitester.client;
 
+import okhttp3.HttpUrl;
+import okhttp3.Request;
 import vn.io.codelearning.springapitester.model.EndpointModel;
-import vn.io.codelearning.springapitester.model.HeaderItem;
 import vn.io.codelearning.springapitester.model.ParameterModel;
 import vn.io.codelearning.springapitester.model.ParamTypeEnum;
 import vn.io.codelearning.springapitester.model.RequestBodyType;
+import vn.io.codelearning.springapitester.state.CredentialStore;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.io.File;
+import java.util.List;
+import java.util.Locale;
 
+/**
+ * Xây dựng câu lệnh cURL và PowerShell an toàn, chính xác từ EndpointModel hoặc okhttp3.Request.
+ */
 public class CurlBuilder {
 
+    /**
+     * Escape an argument according to POSIX shell single-quoting rules.
+     * Every character inside single quotes is treated literally by POSIX shell (bash, sh, zsh).
+     * Single quotes within the string are represented as '\''.
+     */
+    public static String escapeShellArg(String arg) {
+        if (arg == null) return "''";
+        if (arg.isEmpty()) return "''";
+        return "'" + arg.replace("'", "'\\''") + "'";
+    }
+
+    /**
+     * Escape an argument for PowerShell single-quoting rules.
+     */
+    public static String escapePowerShellArg(String arg) {
+        if (arg == null) return "''";
+        if (arg.isEmpty()) return "''";
+        return "'" + arg.replace("'", "''") + "'";
+    }
+
+    public static boolean isSensitiveQueryParam(String key) {
+        if (key == null) return false;
+        String k = key.toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
+        return k.contains("apikey") || k.contains("token")
+                || k.contains("secret") || k.contains("password") || k.equals("key") || k.contains("auth");
+    }
+
     public static String buildCurl(EndpointModel endpoint, String fullUrlPattern) {
+        return buildCurl(endpoint, fullUrlPattern, false);
+    }
+
+    public static String buildCurl(EndpointModel endpoint, String fullUrlPattern, boolean includeCredentials) {
+        if (endpoint == null) return "curl";
+        Request request = HttpRequestBuilder.buildRequest(endpoint, fullUrlPattern);
+        return buildCurl(request, endpoint, includeCredentials);
+    }
+
+    public static String buildCurl(Request request, boolean includeCredentials) {
+        return buildCurl(request, null, includeCredentials);
+    }
+
+    public static String buildCurl(Request request, EndpointModel endpoint, boolean includeCredentials) {
+        if (request == null) return "curl";
+
         StringBuilder curl = new StringBuilder("curl");
+        curl.append(" -X ").append(request.method());
 
-        // Request Method
-        if (endpoint.getHttpMethod() != null) {
-            curl.append(" -X ").append(endpoint.getHttpMethod().name());
-        }
-
-        // Build URL (hỗ trợ cả pattern regex)
-        String urlPath = fullUrlPattern;
-        for (ParameterModel param : endpoint.getParameters()) {
-            if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
-                String value = RequestValidationUtil.resolveParamValue(param);
-                if (param.isRequired() && value.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Missing required path variable: " + param.getName());
-                }
-                urlPath = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
-            }
-        }
-        
-        StringBuilder queryParams = new StringBuilder();
-        boolean firstQuery = true;
-        for (ParameterModel param : endpoint.getParameters()) {
-            if (param.getParamType() == ParamTypeEnum.QUERY_PARAM && param.isEnabled()) {
-                String value = RequestValidationUtil.resolveParamValue(param);
-                if (param.isRequired() && value.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Missing required query parameter: " + param.getName());
-                }
-                if (!value.trim().isEmpty()) {
-                    queryParams.append(firstQuery ? "?" : "&")
-                            .append(param.getName()).append("=").append(value);
-                    firstQuery = false;
+        HttpUrl url = request.url();
+        String finalUrl = url.toString();
+        if (!includeCredentials) {
+            HttpUrl.Builder sanitized = url.newBuilder();
+            boolean modified = false;
+            for (int i = 0; i < url.querySize(); i++) {
+                String qName = url.queryParameterName(i);
+                if (isSensitiveQueryParam(qName)) {
+                    sanitized.setQueryParameter(qName, "[REDACTED]");
+                    modified = true;
                 }
             }
-        }
-        
-        // Custom Auth Query Param for API Key
-        if (endpoint.getAuthConfig() != null && 
-            endpoint.getAuthConfig().getAuthType() == vn.io.codelearning.springapitester.model.AuthTypeEnum.API_KEY && 
-            !endpoint.getAuthConfig().isApiKeyInHeader()) {
-            
-            String keyName = endpoint.getAuthConfig().getApiKeyName() != null ? endpoint.getAuthConfig().getApiKeyName() : "";
-            String keyValue = endpoint.getAuthConfig().getApiKeyValue() != null ? endpoint.getAuthConfig().getApiKeyValue() : "";
-            if (!keyName.isEmpty()) {
-                queryParams.append(firstQuery ? "?" : "&").append(keyName).append("=").append(keyValue);
+            if (modified) {
+                finalUrl = sanitized.build().toString();
             }
         }
+        curl.append(" ").append(escapeShellArg(finalUrl));
 
-        curl.append(" \"").append(urlPath).append(queryParams).append("\"");
-
-        // Headers
-        java.util.Map<String, String> cookieParams = new java.util.LinkedHashMap<>();
-
-        if (endpoint.getCustomHeaders() != null) {
-            for (HeaderItem header : endpoint.getCustomHeaders()) {
-                if (header.isEnabled() && header.getKey() != null && !header.getKey().isBlank()) {
-                    RequestValidationUtil.validateHeader(header.getKey(), header.getValue());
-                    String val = header.getValue() != null ? header.getValue() : "";
-                    if ("Cookie".equalsIgnoreCase(header.getKey())) {
-                        cookieParams.putAll(RequestValidationUtil.parseCookieHeader(val));
-                    } else {
-                        curl.append(" \\\n  -H \"").append(header.getKey()).append(": ").append(val).append("\"");
-                    }
-                }
+        okhttp3.Headers headers = request.headers();
+        boolean hasContentType = headers.get("Content-Type") != null;
+        if (!hasContentType && request.body() != null && request.body().contentType() != null) {
+            if (endpoint == null || endpoint.getBodyType() != RequestBodyType.FORM_DATA) {
+                curl.append(" \\\n  -H ").append(escapeShellArg("Content-Type: " + request.body().contentType()));
             }
         }
-
-        for (ParameterModel param : endpoint.getParameters()) {
-            if (param.getParamType() == ParamTypeEnum.HEADER && param.isEnabled()) {
-                String value = RequestValidationUtil.resolveParamValue(param);
-                if (param.isRequired() && value.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Missing required header: " + param.getName());
-                }
-                if (!value.trim().isEmpty()) {
-                    RequestValidationUtil.validateHeader(param.getName(), value);
-                    curl.append(" \\\n  -H \"").append(param.getName()).append(": ").append(value).append("\"");
-                }
+        for (int i = 0; i < headers.size(); i++) {
+            String name = headers.name(i);
+            String val = headers.value(i);
+            if (!includeCredentials && CredentialStore.isSensitiveHeader(name)) {
+                val = "[REDACTED]";
             }
+            curl.append(" \\\n  -H ").append(escapeShellArg(name + ": " + val));
         }
 
-        for (ParameterModel param : endpoint.getParameters()) {
-            if (param.getParamType() == ParamTypeEnum.COOKIE && param.isEnabled()) {
-                String value = RequestValidationUtil.resolveParamValue(param);
-                if (param.isRequired() && value.trim().isEmpty()) {
-                    throw new IllegalArgumentException("Missing required cookie: " + param.getName());
-                }
-                if (!value.trim().isEmpty()) {
-                    RequestValidationUtil.validateCookie(param.getName(), value);
-                    cookieParams.put(param.getName(), value);
-                }
-            }
-        }
-
-        if (!cookieParams.isEmpty()) {
-            curl.append(" \\\n  -H \"Cookie: ").append(RequestValidationUtil.formatCookieHeader(cookieParams)).append("\"");
-        }
-
-        // Auth Headers
-        if (endpoint.getAuthConfig() != null) {
-            switch (endpoint.getAuthConfig().getAuthType()) {
-                case BEARER_TOKEN:
-                    String token = endpoint.getAuthConfig().getBearerToken() != null ? endpoint.getAuthConfig().getBearerToken().trim() : "";
-                    if (!token.isEmpty()) {
-                        curl.append(" \\\n  -H \"Authorization: Bearer ").append(token).append("\"");
-                    }
-                    break;
-                case BASIC_AUTH:
-                    String user = endpoint.getAuthConfig().getUsername() != null ? endpoint.getAuthConfig().getUsername() : "";
-                    String pass = endpoint.getAuthConfig().getPassword() != null ? endpoint.getAuthConfig().getPassword() : "";
-                    String encoded = Base64.getEncoder().encodeToString((user + ":" + pass).getBytes(StandardCharsets.UTF_8));
-                    curl.append(" \\\n  -H \"Authorization: Basic ").append(encoded).append("\"");
-                    break;
-                case API_KEY:
-                    if (endpoint.getAuthConfig().isApiKeyInHeader()) {
-                        String kName = endpoint.getAuthConfig().getApiKeyName() != null ? endpoint.getAuthConfig().getApiKeyName() : "";
-                        String kVal = endpoint.getAuthConfig().getApiKeyValue() != null ? endpoint.getAuthConfig().getApiKeyValue() : "";
-                        if (!kName.isEmpty()) {
-                            curl.append(" \\\n  -H \"").append(kName).append(": ").append(kVal).append("\"");
-                        }
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        // Body
-        if (endpoint.getHttpMethod() != vn.io.codelearning.springapitester.model.HttpMethodEnum.GET) {
-            if (endpoint.getBodyType() == RequestBodyType.FORM_DATA) {
-                for (ParameterModel param : endpoint.getParameters()) {
-                    if (!param.isEnabled()) continue;
-                    if (param.getParamType() == ParamTypeEnum.FORM_DATA || 
+        if (endpoint != null && endpoint.getBodyType() == RequestBodyType.FORM_DATA) {
+            for (ParameterModel param : endpoint.getParameters()) {
+                if (!param.isEnabled()) continue;
+                if (param.getParamType() == ParamTypeEnum.FORM_DATA ||
                         param.getParamType() == ParamTypeEnum.MULTIPART_FILE ||
                         param.getParamType() == ParamTypeEnum.MODEL_ATTRIBUTE) {
-                        
-                        String key = param.getName();
-                        String val = RequestValidationUtil.resolveParamValue(param);
-                        if (param.isRequired() && val.trim().isEmpty()) {
-                            throw new IllegalArgumentException("Missing required form parameter: " + key);
-                        }
-                        if (key != null && !key.isEmpty() && !val.trim().isEmpty()) {
-                            if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
-                                java.util.List<java.io.File> files = RequestValidationUtil.parseFilePaths(val);
-                                if (files.isEmpty() && param.isRequired()) {
-                                    throw new IllegalArgumentException("Missing required file for parameter: " + key);
-                                }
-                                for (java.io.File file : files) {
-                                    if (!file.exists() || !file.isFile()) {
-                                        throw new IllegalArgumentException("File not found or not a valid file: " + file.getPath() + " for parameter: " + key);
-                                    }
-                                    String mime = RequestValidationUtil.detectMimeType(file);
-                                    curl.append(" \\\n  -F \"").append(key).append("=@").append(file.getAbsolutePath()).append(";type=").append(mime).append("\"");
-                                }
+                    String key = param.getName();
+                    String val = RequestValidationUtil.resolveParamValue(param);
+                    if (key != null && !key.isEmpty() && !val.trim().isEmpty()) {
+                        if (param.getParamType() == ParamTypeEnum.MULTIPART_FILE) {
+                            List<File> files = RequestValidationUtil.parseFilePaths(val);
+                            for (File file : files) {
+                                String mime = RequestValidationUtil.detectMimeType(file);
+                                curl.append(" \\\n  -F ").append(escapeShellArg(key + "=@" + file.getAbsolutePath() + ";type=" + mime));
+                            }
+                        } else {
+                            if (RequestValidationUtil.isJson(val)) {
+                                curl.append(" \\\n  -F ").append(escapeShellArg(key + "=" + val + ";type=application/json"));
                             } else {
-                                if (RequestValidationUtil.isJson(val)) {
-                                    curl.append(" \\\n  -F \"").append(key).append("=").append(val.replace("\"", "\\\"")).append(";type=application/json\"");
-                                } else {
-                                    curl.append(" \\\n  -F \"").append(key).append("=").append(val).append("\"");
-                                }
+                                curl.append(" \\\n  -F ").append(escapeShellArg(key + "=" + val));
                             }
                         }
                     }
                 }
-            } else {
-                String json = endpoint.getRequestBodyJson();
-                if (json != null && !json.trim().isEmpty()) {
-                    curl.append(" \\\n  -H \"Content-Type: application/json\"");
-                    // Escape single quotes for bash
-                    String escapedJson = json.replace("'", "'\\''");
-                    curl.append(" \\\n  -d '").append(escapedJson).append("'");
-                }
             }
+        } else if (request.body() != null) {
+            String json = endpoint != null ? endpoint.getRequestBodyJson() : "";
+            if (json == null || json.trim().isEmpty()) {
+                json = "{}";
+            }
+            curl.append(" \\\n  --data-raw ").append(escapeShellArg(json));
         }
 
         return curl.toString();
+    }
+
+    public static String buildPowerShell(EndpointModel endpoint, String fullUrlPattern, boolean includeCredentials) {
+        if (endpoint == null) return "";
+        Request request = HttpRequestBuilder.buildRequest(endpoint, fullUrlPattern);
+        StringBuilder ps = new StringBuilder("Invoke-RestMethod");
+        ps.append(" -Method ").append(request.method());
+
+        HttpUrl url = request.url();
+        String finalUrl = url.toString();
+        if (!includeCredentials) {
+            HttpUrl.Builder sanitized = url.newBuilder();
+            boolean modified = false;
+            for (int i = 0; i < url.querySize(); i++) {
+                String qName = url.queryParameterName(i);
+                if (isSensitiveQueryParam(qName)) {
+                    sanitized.setQueryParameter(qName, "[REDACTED]");
+                    modified = true;
+                }
+            }
+            if (modified) {
+                finalUrl = sanitized.build().toString();
+            }
+        }
+        ps.append(" -Uri ").append(escapePowerShellArg(finalUrl));
+
+        okhttp3.Headers headers = request.headers();
+        if (headers.size() > 0) {
+            ps.append(" -Headers @{");
+            boolean first = true;
+            for (int i = 0; i < headers.size(); i++) {
+                String name = headers.name(i);
+                String val = headers.value(i);
+                if (!includeCredentials && CredentialStore.isSensitiveHeader(name)) {
+                    val = "[REDACTED]";
+                }
+                if (!first) ps.append("; ");
+                ps.append(escapePowerShellArg(name)).append(" = ").append(escapePowerShellArg(val));
+                first = false;
+            }
+            ps.append("}");
+        }
+
+        if (endpoint.getBodyType() == RequestBodyType.JSON && endpoint.getRequestBodyJson() != null && !endpoint.getRequestBodyJson().isBlank()) {
+            ps.append(" -Body ").append(escapePowerShellArg(endpoint.getRequestBodyJson()));
+        }
+
+        return ps.toString();
     }
 }
