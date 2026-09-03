@@ -154,6 +154,32 @@ public class SpringConfigResolutionServiceTest {
         Assert.assertEquals("user-service", routes.get(1).getId());
     }
 
+    @Test
+    public void testMatchesProfileMultipleActiveProfiles() {
+        // Active profiles: dev,local
+        Assert.assertTrue(SpringConfigResolutionService.matchesProfile("dev", "dev,local"));
+        Assert.assertTrue(SpringConfigResolutionService.matchesProfile("local", "dev,local"));
+        Assert.assertTrue(SpringConfigResolutionService.matchesProfile("dev,staging", "dev,local"));
+        Assert.assertFalse(SpringConfigResolutionService.matchesProfile("prod", "dev,local"));
+        Assert.assertFalse(SpringConfigResolutionService.matchesProfile("qa", "dev,local"));
+    }
+
+    @Test
+    public void testMatchesProfileYamlListFormat() {
+        // Active profiles: [dev, local]
+        Assert.assertTrue(SpringConfigResolutionService.matchesProfile("dev", "[dev, local]"));
+        Assert.assertTrue(SpringConfigResolutionService.matchesProfile("local", "[dev, local]"));
+        Assert.assertFalse(SpringConfigResolutionService.matchesProfile("prod", "[dev, local]"));
+    }
+
+    @Test
+    public void testSpringServerConfigAppName() {
+        SpringServerConfig config = new SpringServerConfig();
+        Assert.assertEquals("", config.getAppName());
+        config.setAppName("order-service");
+        Assert.assertEquals("order-service", config.getAppName());
+    }
+
     // Lightweight MockVirtualFile for testing path exclusion
     private static class MockVirtualFile extends com.intellij.mock.MockVirtualFile {
         private final String fullPath;

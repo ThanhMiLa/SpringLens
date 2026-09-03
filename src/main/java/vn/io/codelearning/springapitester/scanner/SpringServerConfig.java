@@ -14,6 +14,7 @@ public class SpringServerConfig {
     private String sourceFile = "";
     private boolean isFallback = true;
     private boolean hasUnresolvedPlaceholder = false;
+    private String appName = "";
     private final List<String> diagnostics = new ArrayList<>();
 
     public SpringServerConfig() {
@@ -21,6 +22,7 @@ public class SpringServerConfig {
         this.contextPath = "";
         this.sslEnabled = false;
         this.activeProfile = "";
+        this.appName = "";
     }
 
     public SpringServerConfig(int port, String contextPath, boolean sslEnabled) {
@@ -61,6 +63,14 @@ public class SpringServerConfig {
 
     public void setActiveProfile(String activeProfile) {
         this.activeProfile = (activeProfile != null) ? activeProfile : "";
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = (appName != null) ? appName : "";
     }
 
     public String getSourceFile() {

@@ -75,16 +75,32 @@ public class SpringEndpointScanner {
                     moduleName = contentRoots[0].getName();
                 }
                 
-                vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig config = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project, module);
-                directBaseUrl = config.baseUrl;
-                if (config.appName != null && !config.appName.isEmpty()) {
-                    moduleName = config.appName;
+                if (configService != null) {
+                    SpringServerConfig serverConfig = configService.resolveServerConfig(module);
+                    directBaseUrl = serverConfig.getBaseUrl();
+                    if (serverConfig.getAppName() != null && !serverConfig.getAppName().isEmpty()) {
+                        moduleName = serverConfig.getAppName();
+                    }
+                } else {
+                    vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig config = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project, module);
+                    directBaseUrl = config.baseUrl;
+                    if (config.appName != null && !config.appName.isEmpty()) {
+                        moduleName = config.appName;
+                    }
                 }
             } else {
-                vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig config = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project);
-                directBaseUrl = config.baseUrl;
-                if (config.appName != null && !config.appName.isEmpty()) {
-                    moduleName = config.appName;
+                if (configService != null) {
+                    SpringServerConfig serverConfig = configService.resolveServerConfig();
+                    directBaseUrl = serverConfig.getBaseUrl();
+                    if (serverConfig.getAppName() != null && !serverConfig.getAppName().isEmpty()) {
+                        moduleName = serverConfig.getAppName();
+                    }
+                } else {
+                    vn.io.codelearning.springapitester.util.SpringBootConfigReader.AppConfig config = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractAppConfig(project);
+                    directBaseUrl = config.baseUrl;
+                    if (config.appName != null && !config.appName.isEmpty()) {
+                        moduleName = config.appName;
+                    }
                 }
             }
 

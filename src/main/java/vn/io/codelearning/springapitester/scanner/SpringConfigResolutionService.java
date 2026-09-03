@@ -228,6 +228,12 @@ public class SpringConfigResolutionService implements Disposable {
         if ("true".equalsIgnoreCase(sslEnabled) || (sslKeyStore != null && !sslKeyStore.isBlank())) {
             config.setSslEnabled(true);
         }
+
+        // Resolve application name
+        String appName = accumulatedProps.get("spring.application.name");
+        if (appName != null && !appName.isBlank()) {
+            config.setAppName(resolvePlaceholders(appName, accumulatedProps, config.getDiagnostics()).trim());
+        }
     }
 
     private GatewayConfig readGatewayConfigInternal() {
@@ -282,13 +288,16 @@ public class SpringConfigResolutionService implements Disposable {
             }
         }
 
+        Set<String> visitedFiles = new HashSet<>();
         Yaml yaml = new Yaml();
         for (VirtualFile vf : candidateFiles) {
             if (!isConfigFileActive(vf.getName(), activeProfile)) {
                 continue;
             }
+            visitedFiles.add(vf.getPath());
             if (vf.getName().endsWith(".properties")) {
                 Map<String, String> p = loadPropertiesFromFile(vf, activeProfile, config.diagnostics);
+                processConfigImports(p, gatewayModule, activeProfile, accumulatedProps, visitedFiles, config.diagnostics);
                 accumulatedProps.putAll(p);
                 String pPort = p.get("server.port");
                 if (pPort != null) {
@@ -630,11 +639,27 @@ public class SpringConfigResolutionService implements Disposable {
         return true;
     }
 
-    private static boolean matchesProfile(String profileSpec, String activeProfile) {
+    public static boolean matchesProfile(String profileSpec, String activeProfile) {
         if (profileSpec == null || profileSpec.isBlank()) return true;
         if (activeProfile == null || activeProfile.isBlank()) return false;
+
+        Set<String> activeProfiles = new HashSet<>();
+        String cleaned = activeProfile.trim();
+        if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+            cleaned = cleaned.substring(1, cleaned.length() - 1);
+        }
+        for (String ap : cleaned.split(",")) {
+            String trimmed = ap.trim();
+            if (!trimmed.isEmpty()) {
+                activeProfiles.add(trimmed.toLowerCase(Locale.ROOT));
+            }
+        }
+
         for (String p : profileSpec.split(",")) {
-            if (p.trim().equalsIgnoreCase(activeProfile.trim())) return true;
+            String trimmed = p.trim().toLowerCase(Locale.ROOT);
+            if (!trimmed.isEmpty() && activeProfiles.contains(trimmed)) {
+                return true;
+            }
         }
         return false;
     }

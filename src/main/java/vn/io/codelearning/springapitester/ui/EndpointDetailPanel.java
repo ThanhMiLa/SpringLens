@@ -98,7 +98,11 @@ public class EndpointDetailPanel extends JPanel {
             try {
                 vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig config = 
                         vn.io.codelearning.springapitester.util.GatewayConfigReader.findGatewayConfig(project);
-                String extractedBase = vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
+                vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService configService =
+                        vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.getInstance(project);
+                String extractedBase = configService != null
+                        ? configService.resolveServerConfig().getBaseUrl()
+                        : vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (project.isDisposed()) return;
                     this.cachedGatewayConfig = config;
