@@ -221,7 +221,7 @@ public class GatewayConfigReader {
                                                         }
                                                     }
                                                 }
-                                                config.routes.add(route);
+                                                vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.mergeRoute(config.routes, route);
                                             }
                                         }
                                     }

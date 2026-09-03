@@ -87,6 +87,73 @@ public class SpringConfigResolutionServiceTest {
         Assert.assertEquals("Warning: using default port", config.getDiagnostics().get(0));
     }
 
+    @Test
+    public void testProfileFilteringAndPrecedence() {
+        Assert.assertTrue(SpringConfigResolutionService.isConfigFileActive("application.properties", "dev"));
+        Assert.assertTrue(SpringConfigResolutionService.isConfigFileActive("application.yml", "dev"));
+        Assert.assertTrue(SpringConfigResolutionService.isConfigFileActive("application-dev.properties", "dev"));
+        Assert.assertTrue(SpringConfigResolutionService.isConfigFileActive("application-dev.yml", "dev"));
+        Assert.assertFalse(SpringConfigResolutionService.isConfigFileActive("application-prod.properties", "dev"));
+        Assert.assertFalse(SpringConfigResolutionService.isConfigFileActive("application-prod.yml", "dev"));
+        Assert.assertFalse(SpringConfigResolutionService.isConfigFileActive("application-dev.properties", ""));
+
+        // Properties overrides YAML at same level
+        Assert.assertTrue(SpringConfigResolutionService.getFilePrecedence("application.yml") <
+                SpringConfigResolutionService.getFilePrecedence("application.properties"));
+        Assert.assertTrue(SpringConfigResolutionService.getFilePrecedence("application.properties") <
+                SpringConfigResolutionService.getFilePrecedence("application-dev.yml"));
+        Assert.assertTrue(SpringConfigResolutionService.getFilePrecedence("application-dev.yml") <
+                SpringConfigResolutionService.getFilePrecedence("application-dev.properties"));
+    }
+
+    @Test
+    public void testNestedAndDefaultPlaceholders() {
+        Map<String, String> emptyProps = new HashMap<>();
+        List<String> diagnostics = new ArrayList<>();
+
+        // Nested placeholder with fallback to default
+        String nested = SpringConfigResolutionService.resolvePlaceholders(
+                "${BASE_PATH:${API_PREFIX:/api}}", emptyProps, diagnostics);
+        Assert.assertEquals("/api", nested);
+
+        // Simple default
+        String port = SpringConfigResolutionService.resolvePlaceholders(
+                "${PORT:9090}", emptyProps, diagnostics);
+        Assert.assertEquals("9090", port);
+
+        // Default with colons (URL)
+        String url = SpringConfigResolutionService.resolvePlaceholders(
+                "${APP_URL:http://localhost:8080}", emptyProps, diagnostics);
+        Assert.assertEquals("http://localhost:8080", url);
+    }
+
+    @Test
+    public void testDeterministicGatewayRouteMerging() {
+        List<vn.io.codelearning.springapitester.model.GatewayRouteModel> routes = new ArrayList<>();
+
+        vn.io.codelearning.springapitester.model.GatewayRouteModel route1 = new vn.io.codelearning.springapitester.model.GatewayRouteModel();
+        route1.setId("order-service");
+        route1.setUri("lb://order-service");
+
+        vn.io.codelearning.springapitester.model.GatewayRouteModel route2 = new vn.io.codelearning.springapitester.model.GatewayRouteModel();
+        route2.setId("user-service");
+        route2.setUri("lb://user-service");
+
+        vn.io.codelearning.springapitester.model.GatewayRouteModel route3 = new vn.io.codelearning.springapitester.model.GatewayRouteModel();
+        route3.setId("order-service"); // Same ID as route 1
+        route3.setUri("http://localhost:8082");
+
+        SpringConfigResolutionService.mergeRoute(routes, route1);
+        SpringConfigResolutionService.mergeRoute(routes, route2);
+        SpringConfigResolutionService.mergeRoute(routes, route3);
+
+        // Deduplicated and merged by ID: 2 routes total
+        Assert.assertEquals(2, routes.size());
+        Assert.assertEquals("order-service", routes.get(0).getId());
+        Assert.assertEquals("http://localhost:8082", routes.get(0).getUri());
+        Assert.assertEquals("user-service", routes.get(1).getId());
+    }
+
     // Lightweight MockVirtualFile for testing path exclusion
     private static class MockVirtualFile extends com.intellij.mock.MockVirtualFile {
         private final String fullPath;

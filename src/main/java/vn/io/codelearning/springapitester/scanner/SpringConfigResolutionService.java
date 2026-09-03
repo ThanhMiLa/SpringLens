@@ -153,10 +153,17 @@ public class SpringConfigResolutionService implements Disposable {
             }
         }
 
-        // Second pass: apply base then active profile configs
+        // Second pass: apply base then active profile configs with import resolution
+        Set<String> visitedFiles = new HashSet<>();
         for (VirtualFile vf : candidateFiles) {
+            if (!isConfigFileActive(vf.getName(), activeProfile)) {
+                continue;
+            }
+            visitedFiles.add(vf.getPath());
             Map<String, String> fileProps = loadPropertiesFromFile(vf, activeProfile, config.getDiagnostics());
             if (!fileProps.isEmpty()) {
+                // Process spring.config.import
+                processConfigImports(fileProps, targetModule, activeProfile, accumulatedProps, visitedFiles, config.getDiagnostics());
                 accumulatedProps.putAll(fileProps);
                 config.setSourceFile(vf.getPath());
                 config.setFallback(false);
@@ -249,6 +256,9 @@ public class SpringConfigResolutionService implements Disposable {
 
         Yaml yaml = new Yaml();
         for (VirtualFile vf : candidateFiles) {
+            if (!isConfigFileActive(vf.getName(), activeProfile)) {
+                continue;
+            }
             if (vf.getName().endsWith(".properties")) {
                 Map<String, String> p = loadPropertiesFromFile(vf, activeProfile, config.diagnostics);
                 accumulatedProps.putAll(p);
@@ -331,7 +341,7 @@ public class SpringConfigResolutionService implements Disposable {
                                 parseRoutePredicates(routeMap.get("predicates"), route);
                                 parseRouteFilters(routeMap.get("filters"), route);
 
-                                config.routes.add(route);
+                                mergeRoute(config.routes, route);
                             }
                         }
                     }
@@ -464,13 +474,98 @@ public class SpringConfigResolutionService implements Disposable {
                 || path.contains("/node_modules/");
     }
 
+    public static void mergeRoute(List<GatewayRouteModel> routes, GatewayRouteModel newRoute) {
+        if (routes == null || newRoute == null) return;
+        String id = newRoute.getId();
+        if (id != null && !id.isBlank()) {
+            for (int i = 0; i < routes.size(); i++) {
+                GatewayRouteModel existing = routes.get(i);
+                if (id.equalsIgnoreCase(existing.getId())) {
+                    routes.set(i, newRoute);
+                    return;
+                }
+            }
+        }
+        routes.add(newRoute);
+    }
+
+    private void processConfigImports(Map<String, String> fileProps, @Nullable Module module,
+                                      String activeProfile, Map<String, String> targetProps,
+                                      Set<String> visitedFiles, @Nullable List<String> diagnostics) {
+        String importDirective = fileProps.get("spring.config.import");
+        if (importDirective == null || importDirective.isBlank()) return;
+
+        for (String item : importDirective.split(",")) {
+            String clean = item.trim();
+            if (clean.startsWith("optional:")) clean = clean.substring("optional:".length()).trim();
+            if (clean.startsWith("classpath:")) clean = clean.substring("classpath:".length()).trim();
+            if (clean.startsWith("file:")) clean = clean.substring("file:".length()).trim();
+            if (clean.startsWith("/")) clean = clean.substring(1).trim();
+
+            VirtualFile importedFile = findConfigFileByName(clean, module);
+            if (importedFile != null && visitedFiles.add(importedFile.getPath())) {
+                Map<String, String> imported = loadPropertiesFromFile(importedFile, activeProfile, diagnostics);
+                processConfigImports(imported, module, activeProfile, targetProps, visitedFiles, diagnostics);
+                targetProps.putAll(imported);
+            }
+        }
+    }
+
+    private VirtualFile findConfigFileByName(String filename, @Nullable Module module) {
+        if (filename == null || filename.isBlank()) return null;
+        GlobalSearchScope scope = module != null
+                ? GlobalSearchScope.moduleRuntimeScope(module, false)
+                : GlobalSearchScope.projectScope(project);
+        Collection<VirtualFile> files = FilenameIndex.getVirtualFilesByName(project, filename, scope);
+        for (VirtualFile file : files) {
+            if (file.isValid() && !file.isDirectory() && !isGeneratedOrBuildFile(file)) {
+                return file;
+            }
+        }
+        return null;
+    }
+
     public static int getFilePrecedence(String filename) {
         String name = filename.toLowerCase(Locale.ROOT);
-        if (name.equals("bootstrap.properties") || name.equals("bootstrap.yml") || name.equals("bootstrap.yaml")) return 10;
-        if (name.startsWith("bootstrap-")) return 20;
-        if (name.equals("application.properties") || name.equals("application.yml") || name.equals("application.yaml")) return 30;
-        if (name.startsWith("application-")) return 40;
+        boolean isProperties = name.endsWith(".properties");
+        if (name.equals("bootstrap.properties") || name.equals("bootstrap.yml") || name.equals("bootstrap.yaml")) {
+            return isProperties ? 11 : 10;
+        }
+        if (name.startsWith("bootstrap-")) {
+            return isProperties ? 21 : 20;
+        }
+        if (name.equals("application.properties") || name.equals("application.yml") || name.equals("application.yaml")) {
+            return isProperties ? 31 : 30;
+        }
+        if (name.startsWith("application-")) {
+            return isProperties ? 41 : 40;
+        }
         return 100;
+    }
+
+    public static String getProfileFromFilename(String filename) {
+        if (filename == null) return null;
+        String name = filename.toLowerCase(Locale.ROOT);
+        int dot = name.lastIndexOf('.');
+        if (dot > 0) name = name.substring(0, dot);
+        if (name.startsWith("application-")) {
+            return name.substring("application-".length());
+        }
+        if (name.startsWith("bootstrap-")) {
+            return name.substring("bootstrap-".length());
+        }
+        return null;
+    }
+
+    public static boolean isConfigFileActive(String filename, String activeProfile) {
+        String profile = getProfileFromFilename(filename);
+        if (profile == null) {
+            return true;
+        }
+        if (activeProfile == null || activeProfile.isBlank()) {
+            return false;
+        }
+        return matchesProfile(profile, activeProfile);
     }
 
     private static boolean isConfigFile(String filename) {
