@@ -259,10 +259,8 @@ public class EndpointIdentityAndStateKeyTest {
     }
 
     @Test
-    public void testPruningOrphanScannedEndpointsDeletesStoredCredentials() {
-        CredentialStore store = new CredentialStore("test-project", new CredentialStore.MemoryBackend());
+    public void testPruningOrphanScannedEndpointsRemovesSavedState() {
         SpringLensState state = new SpringLensState();
-        state.attachCredentialStoreForTest(store);
 
         EndpointModel ep1 = new EndpointModel(HttpMethodEnum.GET, "/api/kept", "KeptCtrl", "com.example", "kept");
         EndpointModel ep2 = new EndpointModel(HttpMethodEnum.GET, "/api/deleted", "DeletedCtrl", "com.example", "deleted");
@@ -270,20 +268,9 @@ public class EndpointIdentityAndStateKeyTest {
         state.saveEndpoint(ep1);
         state.saveEndpoint(ep2);
 
-        // Put a secret for ep2
-        EndpointSavedState saved2 = state.endpoints.get(state.getEndpointKey(ep2));
-        Assert.assertNotNull(saved2);
-        saved2.credentialId = "cred-deleted-endpoint";
-        vn.io.codelearning.springapitester.model.AuthConfig auth = new vn.io.codelearning.springapitester.model.AuthConfig();
-        auth.setBearerToken("secret-token");
-        store.save(saved2.credentialId, auth, java.util.Collections.emptyMap());
-        Assert.assertNotNull(store.load(saved2.credentialId));
-
         // Prune: ep2 is removed because source code no longer has it
         state.pruneOrphanScannedEndpoints(List.of(ep1));
 
         Assert.assertFalse(state.endpoints.containsKey(state.getEndpointKey(ep2)));
-        // Secret must be purged from CredentialStore
-        Assert.assertNull(store.load("cred-deleted-endpoint"));
     }
 }

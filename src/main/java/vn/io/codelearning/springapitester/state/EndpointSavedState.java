@@ -14,7 +14,6 @@ public class EndpointSavedState {
     public Map<String, Boolean> paramEnabled = new HashMap<>();
     public List<HeaderItem> customHeaders = new ArrayList<>();
     public AuthConfig authConfig = new AuthConfig();
-    public String credentialId = "";
     public String requestBodyJson = "";
     public RequestBodyType bodyType = RequestBodyType.NONE;
     public boolean allowInsecureTls = false;

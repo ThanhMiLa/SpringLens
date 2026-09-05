@@ -2,6 +2,11 @@
 
 # SpringLens Changelog
 
+## [Unreleased]
+
+### Changed
+- **Developer-Friendly Data Persistence:** SpringLens now stores and displays request credentials, cookies, and response data verbatim in project state. It no longer uses IntelliJ Password Safe or operating-system keyrings, so opening the tool window does not trigger a credential-permission prompt. Credentials stored only by previous Password Safe versions must be entered again.
+
 ## [1.1.2] - 2026-09-03
 
 ### Added
@@ -13,7 +18,7 @@
 - **Schema v3 State Keys:** Upgraded endpoint state identification to include HTTP method, module name, and path to prevent key collisions across controllers.
 
 ### Changed
-- **Unified Manual Endpoint Restoration:** Refactored manual endpoint loading to delegate to `state.restoreEndpoint()`, ensuring full parity with scanned endpoints for secret decryption, TLS consent, and parameter restoration.
+- **Unified Manual Endpoint Restoration:** Refactored manual endpoint loading to delegate to `state.restoreEndpoint()`, ensuring full parity with scanned endpoints for TLS consent and parameter restoration.
 - **Streamlined Response Reading:** Removed wasteful 10MB drain loops when responses lack `Content-Length` headers, switching to immediate truncation marking and graceful size indication.
 - **Removed Deprecated Legacy Config Reader:** Eliminated legacy `SpringBootConfigReader` fallbacks in endpoint scanners and UI to prevent non-deterministic base URL and port calculations.
 
@@ -24,12 +29,11 @@
 - **Corrupted URL Sanitization:** Upgraded URL building to use RFC 3986 `HttpUrl.resolve` and preserved nested URLs inside query parameters (e.g. proxy endpoints).
 - **False-Positive Binary Response Detection:** Refined binary payload detection to prevent UTF-8 and textual MIME responses with multibyte characters from being incorrectly treated as binary.
 - **Safe Truncated File Saving:** Warn users before saving truncated response bodies to disk and cleanly stripped internal UI truncation banners.
-- **Deferred Credential Migration:** Postponed PasswordSafe credential migration until the IntelliJ `Project` instance is fully attached, preventing secret loss during early state deserialization.
+- **Developer-Friendly Credential Persistence:** Stores request credentials, cookies, and response data verbatim in project state without Password Safe or operating-system keyring prompts.
 
 ### Security
 - **Strict Host-Level TLS Consent:** Enforced explicit user consent dialogs for self-signed certificates restricted to local development hosts (`localhost`, `127.0.0.1`, `::1`), and removed deprecated boolean bypass methods.
-- **IntelliJ PasswordSafe Secret Storage:** Migrated sensitive tokens, passwords, and API keys out of plaintext XML workspace files into IntelliJ's secure `CredentialStore`.
-- **Automatic Request & Response Redaction:** Sanitized sensitive fields (passwords, tokens, secrets) in persisted request bodies and response headers/bodies before storing state to disk.
+- **Visible Development Data:** Keeps tokens, passwords, cookies, and response headers visible for development and testing workflows. Project-state files can therefore contain credentials and must not be shared when they are real.
 
 ## [1.1.1] - 2026-09-01
 

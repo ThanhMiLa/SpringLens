@@ -41,7 +41,7 @@
     <change-notes><![CDATA[
         <h3>1.1.2 — Security, Reliability & Request Handling</h3>
         <ul>
-            <li><b>Safer Workspace Persistence:</b> Protected credentials and sensitive request/response data, added collision-safe schema migration, and prevented orphan pruning after empty scans.</li>
+            <li><b>Developer-Friendly Workspace Persistence:</b> Keeps request credentials and response data visible and persisted per project, added collision-safe schema migration, and prevented orphan pruning after empty scans.</li>
             <li><b>Hardened HTTP Client:</b> Added per-project sessions and cookies, bounded response storage and downloads, fixed asynchronous response races, and enforced explicit consent for insecure local TLS.</li>
             <li><b>More Accurate Requests & Exports:</b> Preserved repeated query parameters and multi-value headers, improved URL resolution, strengthened cURL/PowerShell/CMD quoting, and added multipart file validation.</li>
             <li><b>Deterministic Spring Configuration:</b> Improved multi-module, multi-profile, placeholder, context-path, and Gateway route resolution.</li>

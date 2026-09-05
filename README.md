@@ -71,13 +71,6 @@ cd SpringLens
 ```
 The packaged plugin will be available at `build/distributions/SpringLens-1.1.2.zip`.
 
-
-## TLS Security
-
-SpringLens validates HTTPS certificates and hostnames by default. For trusted local development servers only, an endpoint can explicitly enable insecure TLS for `localhost` or loopback addresses. Never enable this option for remote hosts or production traffic.
-
-Authentication credentials are stored with IntelliJ PasswordSafe rather than project XML. Request-body and response-history persistence are disabled by default because those values may contain sensitive data; enable either option explicitly in the SpringLens tool window when needed.
-
 ## License
 
 SpringLens is under the Apache 2.0 license. See the [Apache License 2.0](./LICENSE) file for details.

@@ -4,10 +4,8 @@ import okhttp3.HttpUrl;
 import okhttp3.Request;
 import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.model.MultipartPartModel;
-import vn.io.codelearning.springapitester.state.CredentialStore;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -40,13 +38,6 @@ public class CurlBuilder {
         return "\"" + escaped + "\"";
     }
 
-    public static boolean isSensitiveQueryParam(String key) {
-        if (key == null) return false;
-        String k = key.toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
-        return k.contains("apikey") || k.contains("token")
-                || k.contains("secret") || k.contains("password") || k.equals("key") || k.contains("auth");
-    }
-
     public static String buildCurl(EndpointModel endpoint, String fullUrlPattern) {
         return buildCurl(endpoint, fullUrlPattern, false);
     }
@@ -71,8 +62,7 @@ public class CurlBuilder {
         curl.append(" ").append(escapeShellArg(sanitizeUrl(request.url(), includeCredentials)));
         for (int i = 0; i < request.headers().size(); i++) {
             String name = request.headers().name(i);
-            String val = (!includeCredentials && CredentialStore.isSensitiveHeader(name))
-                    ? "[REDACTED]" : request.headers().value(i);
+            String val = request.headers().value(i);
             curl.append(" \\\n  -H ").append(escapeShellArg(name + ": " + val));
         }
         if (request.body() != null) {
@@ -95,8 +85,7 @@ public class CurlBuilder {
         curl.append(" ").append(escapeShellArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
 
         for (Map.Entry<String, String> header : resolved.getHeaderEntries()) {
-            String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
-                    ? "[REDACTED]" : header.getValue();
+            String val = header.getValue();
             curl.append(" \\\n  -H ").append(escapeShellArg(header.getKey() + ": " + val));
         }
 
@@ -166,8 +155,7 @@ public class CurlBuilder {
             ps.append(" -Headers @{");
             boolean first = true;
             for (Map.Entry<String, String> header : resolved.getHeaderEntries()) {
-                String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
-                        ? "[REDACTED]" : header.getValue();
+                String val = header.getValue();
                 if (!first) ps.append("; ");
                 ps.append(escapePowerShellArg(header.getKey())).append(" = ").append(escapePowerShellArg(val));
                 first = false;
@@ -190,8 +178,7 @@ public class CurlBuilder {
         cmd.append(" ").append(escapeCmdArg(sanitizeUrl(resolved.getUrl(), includeCredentials)));
 
         for (Map.Entry<String, String> header : resolved.getHeaderEntries()) {
-            String val = (!includeCredentials && CredentialStore.isSensitiveHeader(header.getKey()))
-                    ? "[REDACTED]" : header.getValue();
+            String val = header.getValue();
             cmd.append(" ^\n  -H ").append(escapeCmdArg(header.getKey() + ": " + val));
         }
 
@@ -223,29 +210,6 @@ public class CurlBuilder {
 
     public static String sanitizeUrl(HttpUrl url, boolean includeCredentials) {
         if (url == null) return "";
-        if (includeCredentials) return url.toString();
-        if (url.querySize() == 0) return url.toString();
-
-        boolean hasSensitive = false;
-        for (int i = 0; i < url.querySize(); i++) {
-            if (isSensitiveQueryParam(url.queryParameterName(i))) {
-                hasSensitive = true;
-                break;
-            }
-        }
-        if (!hasSensitive) return url.toString();
-
-        HttpUrl.Builder sanitized = url.newBuilder();
-        sanitized.query(null);
-        for (int i = 0; i < url.querySize(); i++) {
-            String qName = url.queryParameterName(i);
-            String qVal = url.queryParameterValue(i);
-            if (isSensitiveQueryParam(qName)) {
-                sanitized.addQueryParameter(qName, "[REDACTED]");
-            } else {
-                sanitized.addQueryParameter(qName, qVal);
-            }
-        }
-        return sanitized.build().toString();
+        return url.toString();
     }
 }

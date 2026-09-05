@@ -77,25 +77,19 @@ public class CurlBuilderTest {
     }
 
     @Test
-    public void testCurlWithBearerAuthRedactedAndIncluded() {
+    public void testCurlWithBearerAuthIncludesCredentials() {
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/v1/profile", "ProfileController", "com.example", "getProfile");
         AuthConfig auth = new AuthConfig();
         auth.setAuthType(AuthTypeEnum.BEARER_TOKEN);
         auth.setBearerToken("secret-token-jwt-123");
         endpoint.setAuthConfig(auth);
 
-        // Default: redacted
-        String redactedCurl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api/v1/profile");
-        Assert.assertTrue(redactedCurl.contains("-H 'Authorization: [REDACTED]'"));
-        Assert.assertFalse(redactedCurl.contains("secret-token-jwt-123"));
-
-        // With credentials: included
-        String withCreds = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api/v1/profile", true);
-        Assert.assertTrue(withCreds.contains("-H 'Authorization: Bearer secret-token-jwt-123'"));
+        String curl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/api/v1/profile");
+        Assert.assertTrue(curl.contains("-H 'Authorization: Bearer secret-token-jwt-123'"));
     }
 
     @Test
-    public void testCurlWithBasicAuthRedactedAndIncluded() {
+    public void testCurlWithBasicAuthIncludesCredentials() {
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/admin/status", "AdminController", "com.example", "getStatus");
         AuthConfig auth = new AuthConfig();
         auth.setAuthType(AuthTypeEnum.BASIC_AUTH);
@@ -103,11 +97,8 @@ public class CurlBuilderTest {
         auth.setPassword("password123");
         endpoint.setAuthConfig(auth);
 
-        String redactedCurl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/admin/status");
-        Assert.assertTrue(redactedCurl.contains("-H 'Authorization: [REDACTED]'"));
-
-        String withCreds = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/admin/status", true);
-        Assert.assertTrue(withCreds.contains("-H 'Authorization: Basic YWRtaW46cGFzc3dvcmQxMjM='"));
+        String curl = CurlBuilder.buildCurl(endpoint, "http://localhost:8080/admin/status");
+        Assert.assertTrue(curl.contains("-H 'Authorization: Basic YWRtaW46cGFzc3dvcmQxMjM='"));
     }
 
     @Test
@@ -121,10 +112,8 @@ public class CurlBuilderTest {
         auth1.setApiKeyInHeader(true);
         endpoint1.setAuthConfig(auth1);
 
-        String redacted1 = CurlBuilder.buildCurl(endpoint1, "http://localhost:8080/api/v1/data");
-        Assert.assertTrue(redacted1.contains("-H 'X-API-KEY: [REDACTED]'"));
-        String creds1 = CurlBuilder.buildCurl(endpoint1, "http://localhost:8080/api/v1/data", true);
-        Assert.assertTrue(creds1.contains("-H 'X-API-KEY: key-header-val'"));
+        String curl1 = CurlBuilder.buildCurl(endpoint1, "http://localhost:8080/api/v1/data");
+        Assert.assertTrue(curl1.contains("-H 'X-API-KEY: key-header-val'"));
 
         // 2. API Key in Query Param
         EndpointModel endpoint2 = new EndpointModel(HttpMethodEnum.GET, "/api/v1/data", "DataController", "com.example", "getData");
@@ -135,10 +124,8 @@ public class CurlBuilderTest {
         auth2.setApiKeyInHeader(false);
         endpoint2.setAuthConfig(auth2);
 
-        String redacted2 = CurlBuilder.buildCurl(endpoint2, "http://localhost:8080/api/v1/data");
-        Assert.assertTrue(redacted2.contains("api_key=%5BREDACTED%5D") || redacted2.contains("api_key=[REDACTED]"));
-        String creds2 = CurlBuilder.buildCurl(endpoint2, "http://localhost:8080/api/v1/data", true);
-        Assert.assertTrue(creds2.contains("api_key=key-query-val"));
+        String curl2 = CurlBuilder.buildCurl(endpoint2, "http://localhost:8080/api/v1/data");
+        Assert.assertTrue(curl2.contains("api_key=key-query-val"));
     }
 
     @Test
@@ -307,7 +294,7 @@ public class CurlBuilderTest {
     }
 
     @Test
-    public void testCredentialRedactionAcrossAllExportFormats() {
+    public void testCredentialsAreIncludedAcrossAllExportFormats() {
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/v1/secure", "SecureCtrl", "com.example", "getSecure");
         AuthConfig auth = new AuthConfig();
         auth.setAuthType(AuthTypeEnum.BEARER_TOKEN);
@@ -322,23 +309,12 @@ public class CurlBuilderTest {
         String cmd = CurlBuilder.buildWindowsCmd(endpoint, "http://localhost:8080/api/v1/secure", false);
         String ps = CurlBuilder.buildPowerShell(endpoint, "http://localhost:8080/api/v1/secure", false);
 
-        // Bash
-        Assert.assertTrue(bash.contains("apikey=[REDACTED]") || bash.contains("apikey=%5BREDACTED%5D"));
-        Assert.assertTrue(bash.contains("Authorization: [REDACTED]"));
-        Assert.assertFalse(bash.contains("super-secret-token"));
-        Assert.assertFalse(bash.contains("confidential-key"));
-
-        // Windows CMD
-        Assert.assertTrue(cmd.contains("apikey=[REDACTED]") || cmd.contains("apikey=%5BREDACTED%5D") || cmd.contains("apikey=%%5BREDACTED%%5D"));
-        Assert.assertTrue(cmd.contains("Authorization: [REDACTED]"));
-        Assert.assertFalse(cmd.contains("super-secret-token"));
-        Assert.assertFalse(cmd.contains("confidential-key"));
-
-        // PowerShell
-        Assert.assertTrue(ps.contains("apikey=[REDACTED]") || ps.contains("apikey=%5BREDACTED%5D"));
-        Assert.assertTrue(ps.contains("Authorization' = '[REDACTED]'"));
-        Assert.assertFalse(ps.contains("super-secret-token"));
-        Assert.assertFalse(ps.contains("confidential-key"));
+        Assert.assertTrue(bash.contains("apikey=confidential-key"));
+        Assert.assertTrue(bash.contains("Authorization: Bearer super-secret-token"));
+        Assert.assertTrue(cmd.contains("apikey=confidential-key"));
+        Assert.assertTrue(cmd.contains("Authorization: Bearer super-secret-token"));
+        Assert.assertTrue(ps.contains("apikey=confidential-key"));
+        Assert.assertTrue(ps.contains("Authorization' = 'Bearer super-secret-token'"));
     }
 
     @Test
@@ -355,13 +331,12 @@ public class CurlBuilderTest {
     }
 
     @Test
-    public void testSanitizeUrlPreservesRepeatedQueryParams() {
+    public void testSanitizeUrlPreservesRepeatedQueryParamsAndCredentials() {
         okhttp3.HttpUrl url = okhttp3.HttpUrl.parse("http://localhost:8080/api?tag=java&tag=spring&token=secret123");
-        String sanitized = CurlBuilder.sanitizeUrl(url, false);
-        Assert.assertTrue(sanitized.contains("tag=java"));
-        Assert.assertTrue(sanitized.contains("tag=spring"));
-        Assert.assertTrue(sanitized.contains("token=[REDACTED]") || sanitized.contains("token=%5BREDACTED%5D"));
-        Assert.assertFalse(sanitized.contains("secret123"));
+        String exported = CurlBuilder.sanitizeUrl(url, false);
+        Assert.assertTrue(exported.contains("tag=java"));
+        Assert.assertTrue(exported.contains("tag=spring"));
+        Assert.assertTrue(exported.contains("token=secret123"));
     }
 
     @Test

@@ -122,12 +122,12 @@ public class ResponseCachingTest {
         endpoint.setLastResponseBody("{\"token\":\"secret\"}");
         endpoint.setLastResponseHeaders("Authorization: Bearer secret\nSet-Cookie: sid=secret");
 
-        // By default, bodies and response history are persisted (with sensitive headers redacted)
+        // By default, bodies and response history are persisted verbatim.
         state.saveEndpoint(endpoint);
         EndpointSavedState savedDefault = state.endpoints.get(state.getEndpointKey(endpoint));
-        Assert.assertEquals("{\"password\":\"[REDACTED]\"}", savedDefault.requestBodyJson);
-        Assert.assertEquals("{\"token\":\"[REDACTED]\"}", savedDefault.lastResponseBody);
-        Assert.assertEquals("Authorization: [REDACTED]\nSet-Cookie: [REDACTED]", savedDefault.lastResponseHeaders);
+        Assert.assertEquals("{\"password\":\"secret\"}", savedDefault.requestBodyJson);
+        Assert.assertEquals("{\"token\":\"secret\"}", savedDefault.lastResponseBody);
+        Assert.assertEquals("Authorization: Bearer secret\nSet-Cookie: sid=secret", savedDefault.lastResponseHeaders);
 
         // When explicitly disabled, bodies and response history are not persisted
         state.persistRequestBodies = false;
@@ -140,11 +140,16 @@ public class ResponseCachingTest {
     }
 
     @Test
-    public void testSensitiveResponseHeadersAreRedacted() {
-        Assert.assertEquals(
-                "Content-Type: application/json\nAuthorization: [REDACTED]\nSet-Cookie: [REDACTED]",
-                SpringLensState.redactResponseHeaders(
-                        "Content-Type: application/json\nAuthorization: Bearer secret\nSet-Cookie: sid=secret")
-        );
+    public void testSensitiveResponseHeadersArePersistedInHistory() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/secure", "SecureController", "com.example", "secure");
+        endpoint.setLastResponseStatusCode(200);
+        endpoint.setLastResponseHeaders("Authorization: Bearer secret\nSet-Cookie: sid=secret");
+
+        state.saveEndpoint(endpoint);
+
+        EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(endpoint));
+        Assert.assertEquals("Authorization: Bearer secret\nSet-Cookie: sid=secret", saved.lastResponseHeaders);
+        Assert.assertEquals("Authorization: Bearer secret\nSet-Cookie: sid=secret", saved.responseHistory.get(0).responseHeaders);
     }
 }
