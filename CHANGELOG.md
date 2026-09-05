@@ -2,7 +2,7 @@
 
 # SpringLens Changelog
 
-## [Unreleased]
+## [1.1.3] - 2026-09-05
 
 ### Changed
 - **Developer-Friendly Data Persistence:** SpringLens now stores and displays request credentials, cookies, and response data verbatim in project state. It no longer uses IntelliJ Password Safe or operating-system keyrings, so opening the tool window does not trigger a credential-permission prompt. Credentials stored only by previous Password Safe versions must be entered again.
