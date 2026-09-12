@@ -43,6 +43,7 @@ public class EndpointModelTest {
         Assert.assertEquals("[POST] /api/v1/users", endpoint.getDisplayName());
         Assert.assertEquals(HttpMethodEnum.POST, endpoint.getHttpMethod());
         Assert.assertEquals("/api/v1/users", endpoint.getPath());
+        Assert.assertEquals(RequestBodyType.JSON, endpoint.getBodyType());
         Assert.assertFalse(endpoint.isAllowInsecureTls());
         endpoint.setAllowInsecureTls(true);
         Assert.assertTrue(endpoint.isAllowInsecureTls());
@@ -64,6 +65,20 @@ public class EndpointModelTest {
         endpoint.addCustomHeader(new HeaderItem("X-Custom-Header", "Value123"));
         Assert.assertEquals(1, endpoint.getCustomHeaders().size());
         Assert.assertTrue(endpoint.getCustomHeaders().get(0).isEnabled());
+    }
+
+    @Test
+    public void testBodyTypeNormalizesLegacyAndNullValuesToJson() {
+        EndpointModel endpoint = new EndpointModel();
+
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+        Assert.assertEquals(RequestBodyType.FORM_DATA, endpoint.getBodyType());
+
+        endpoint.setBodyType(RequestBodyType.NONE);
+        Assert.assertEquals(RequestBodyType.JSON, endpoint.getBodyType());
+
+        endpoint.setBodyType(null);
+        Assert.assertEquals(RequestBodyType.JSON, endpoint.getBodyType());
     }
 
     @Test

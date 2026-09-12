@@ -15,7 +15,7 @@ public class EndpointSavedState {
     public List<HeaderItem> customHeaders = new ArrayList<>();
     public AuthConfig authConfig = new AuthConfig();
     public String requestBodyJson = "";
-    public RequestBodyType bodyType = RequestBodyType.NONE;
+    public RequestBodyType bodyType = RequestBodyType.JSON;
     public boolean allowInsecureTls = false;
     public String insecureTlsConsentHost = "";
     public int insecureTlsConsentVersion = 0;

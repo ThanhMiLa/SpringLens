@@ -337,7 +337,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
             endpoint.setRequestBodyJson(saved.requestBodyJson);
         }
         
-        // Restore Body Type and Security
+        // Migrate legacy NONE/null values to JSON; FORM_DATA remains an explicit user/scanner choice.
         endpoint.setBodyType(saved.bodyType);
         endpoint.setAllowInsecureTls(saved.allowInsecureTls);
         if (saved.allowInsecureTls && saved.insecureTlsConsentHost != null && !saved.insecureTlsConsentHost.isEmpty()

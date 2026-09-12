@@ -7,6 +7,34 @@ import vn.io.codelearning.springapitester.model.*;
 public class ParameterPersistenceTest {
 
     @Test
+    public void testBodyTypeDefaultsToJsonAndRestoresExplicitFormData() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/upload", "UploadController", "com.example", "upload");
+
+        Assert.assertEquals(RequestBodyType.JSON, endpoint.getBodyType());
+
+        endpoint.setBodyType(RequestBodyType.FORM_DATA);
+        state.saveEndpoint(endpoint);
+
+        EndpointModel restored = new EndpointModel(HttpMethodEnum.POST, "/api/upload", "UploadController", "com.example", "upload");
+        state.restoreEndpoint(restored);
+        Assert.assertEquals(RequestBodyType.FORM_DATA, restored.getBodyType());
+    }
+
+    @Test
+    public void testLegacyNoneBodyTypeRestoresAsJson() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/legacy-body", "LegacyController", "com.example", "legacy");
+        EndpointSavedState legacySaved = new EndpointSavedState();
+        legacySaved.bodyType = RequestBodyType.NONE;
+        state.endpoints.put(state.getEndpointKey(endpoint), legacySaved);
+
+        state.restoreEndpoint(endpoint);
+
+        Assert.assertEquals(RequestBodyType.JSON, endpoint.getBodyType());
+    }
+
+    @Test
     public void testParametersSavedWithTypeNameKeyAndEnabledState() {
         SpringLensState state = new SpringLensState();
 

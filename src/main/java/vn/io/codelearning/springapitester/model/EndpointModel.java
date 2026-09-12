@@ -27,7 +27,8 @@ public class EndpointModel {
     private List<HeaderItem> customHeaders;
     private String requestBodyJson;
     private String requestBodyClassFqn;
-    private RequestBodyType bodyType = RequestBodyType.NONE;
+    // JSON is the deterministic default for JSON request bodies and endpoints without a body.
+    private RequestBodyType bodyType = RequestBodyType.JSON;
     private String returnTypeClassFqn;    // Kiểu trả về của hàm (vd: ResponseEntity<UserDTO>)
     private String expectedResponseJson;  // JSON mẫu dự kiến sinh từ DTO trả về
     private AuthConfig authConfig;
@@ -207,7 +208,10 @@ public class EndpointModel {
     }
 
     public void setBodyType(RequestBodyType bodyType) {
-        this.bodyType = bodyType;
+        // NONE is retained in the enum only to deserialize state written by older versions.
+        this.bodyType = bodyType == RequestBodyType.FORM_DATA
+                ? RequestBodyType.FORM_DATA
+                : RequestBodyType.JSON;
     }
 
     public void addParameter(ParameterModel param) {

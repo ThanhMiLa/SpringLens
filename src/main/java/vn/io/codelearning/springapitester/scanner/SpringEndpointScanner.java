@@ -300,6 +300,7 @@ public class SpringEndpointScanner {
             }
 
             if (paramType == ParamTypeEnum.REQUEST_BODY) {
+                endpoint.setBodyType(vn.io.codelearning.springapitester.model.RequestBodyType.JSON);
                 endpoint.setRequestBodyClassFqn(typeFqn);
                 ParameterModel paramModel = new ParameterModel(finalName, paramType, simpleType, defaultValue, required, "", "");
                 endpoint.addParameter(paramModel);
