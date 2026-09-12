@@ -2,6 +2,15 @@
 
 # SpringLens Changelog
 
+## [1.1.4] - 2026-09-12
+
+### Fixed
+- **Deterministic Request Body Selection:** Request body mode is now selected consistently from the endpoint signature. APIs using `@RequestBody` open in **JSON** mode, while `@ModelAttribute`, `@RequestPart`, and multipart file uploads open in **Form-Data** mode. Endpoints without a request body, along with legacy or missing state, safely default to **JSON**.
+
+### Added
+- **Per-Endpoint Request Tab Memory:** SpringLens now remembers the most recently viewed request section for every API—**Params**, **Headers**, **Cookies**, **Auth**, or **Body**—and restores it when returning to that endpoint.
+- **Persistent Navigation Context:** The remembered request tab is retained for both scanned and manual endpoints across endpoint reloads and IDE restarts. APIs without a prior selection open on **Params** by default.
+
 ## [1.1.3] - 2026-09-05
 
 ### Changed

@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.1.3</version>
+    <version>1.1.4</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
@@ -39,6 +39,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.1.4 — Deterministic Request Setup & Navigation</h3>
+        <ul>
+            <li><b>Per-Endpoint Request Tab Memory:</b> SpringLens remembers each API's last request tab and restores it when you return, including after reload or IDE restart. New APIs open on Params by default.</li>
+            <li><b>Deterministic Request Body Type:</b> JSON request bodies open in JSON mode, while model attributes, request parts, and multipart uploads open in Form-Data mode. Legacy or missing body-type state now defaults safely to JSON.</li>
+        </ul>
         <h3>1.1.3 — Developer-Friendly Persistence, Security & Request Handling</h3>
         <ul>
             <li><b>Developer-Friendly Workspace Persistence:</b> Keeps request credentials and response data visible and persisted per project, added collision-safe schema migration, and prevented orphan pruning after empty scans.</li>
