@@ -7,6 +7,75 @@ import vn.io.codelearning.springapitester.model.*;
 public class ParameterPersistenceTest {
 
     @Test
+    public void testRequestTabIsPersistedIndependentlyForEachScannedEndpoint() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel endpointA = new EndpointModel(HttpMethodEnum.GET, "/api/a", "ApiController", "com.example", "getA");
+        EndpointModel endpointB = new EndpointModel(HttpMethodEnum.POST, "/api/b", "ApiController", "com.example", "createB");
+        endpointA.setSelectedRequestTab(RequestTab.HEADERS);
+        endpointB.setSelectedRequestTab(RequestTab.BODY);
+
+        state.saveEndpoint(endpointA);
+        state.saveEndpoint(endpointB);
+
+        EndpointModel restoredA = new EndpointModel(HttpMethodEnum.GET, "/api/a", "ApiController", "com.example", "getA");
+        EndpointModel restoredB = new EndpointModel(HttpMethodEnum.POST, "/api/b", "ApiController", "com.example", "createB");
+        state.restoreEndpoint(restoredA);
+        state.restoreEndpoint(restoredB);
+
+        Assert.assertEquals(RequestTab.HEADERS, restoredA.getSelectedRequestTab());
+        Assert.assertEquals(RequestTab.BODY, restoredB.getSelectedRequestTab());
+    }
+
+    @Test
+    public void testLegacySavedEndpointWithoutRequestTabRestoresParams() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/legacy-tab", "ApiController", "com.example", "legacyTab");
+        EndpointSavedState legacySaved = new EndpointSavedState();
+        legacySaved.selectedRequestTab = null;
+        state.endpoints.put(state.getEndpointKey(endpoint), legacySaved);
+
+        state.restoreEndpoint(endpoint);
+
+        Assert.assertEquals(RequestTab.PARAMS, endpoint.getSelectedRequestTab());
+    }
+
+    @Test
+    public void testRequestTabCanBePersistedWithoutSavingResponseHistory() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/api/tab-only", "ApiController", "com.example", "tabOnly");
+        endpoint.setSelectedRequestTab(RequestTab.COOKIES);
+
+        state.saveSelectedRequestTab(endpoint);
+
+        EndpointSavedState saved = state.endpoints.get(state.getEndpointKey(endpoint));
+        Assert.assertNotNull(saved);
+        Assert.assertEquals(RequestTab.COOKIES, saved.selectedRequestTab);
+        Assert.assertTrue(saved.responseHistory.isEmpty());
+
+        EndpointModel restored = new EndpointModel(HttpMethodEnum.GET, "/api/tab-only", "ApiController", "com.example", "tabOnly");
+        state.restoreEndpoint(restored);
+        Assert.assertEquals(RequestTab.COOKIES, restored.getSelectedRequestTab());
+    }
+
+    @Test
+    public void testRequestTabIsPersistedForManualEndpoints() {
+        SpringLensState state = new SpringLensState();
+        EndpointModel manualEndpoint = new EndpointModel(HttpMethodEnum.POST, "/manual", "", "", "");
+        manualEndpoint.setManual(true);
+        manualEndpoint.setId("manual-request-tab");
+        manualEndpoint.setSelectedRequestTab(RequestTab.AUTH);
+
+        state.saveEndpoint(manualEndpoint);
+
+        EndpointModel restored = new EndpointModel();
+        restored.setManual(true);
+        restored.setId("manual-request-tab");
+        state.restoreEndpoint(restored);
+
+        Assert.assertEquals(RequestTab.AUTH, restored.getSelectedRequestTab());
+    }
+
+    @Test
     public void testBodyTypeDefaultsToJsonAndRestoresExplicitFormData() {
         SpringLensState state = new SpringLensState();
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/upload", "UploadController", "com.example", "upload");

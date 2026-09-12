@@ -44,6 +44,7 @@ public class EndpointModelTest {
         Assert.assertEquals(HttpMethodEnum.POST, endpoint.getHttpMethod());
         Assert.assertEquals("/api/v1/users", endpoint.getPath());
         Assert.assertEquals(RequestBodyType.JSON, endpoint.getBodyType());
+        Assert.assertEquals(RequestTab.PARAMS, endpoint.getSelectedRequestTab());
         Assert.assertFalse(endpoint.isAllowInsecureTls());
         endpoint.setAllowInsecureTls(true);
         Assert.assertTrue(endpoint.isAllowInsecureTls());
@@ -79,6 +80,19 @@ public class EndpointModelTest {
 
         endpoint.setBodyType(null);
         Assert.assertEquals(RequestBodyType.JSON, endpoint.getBodyType());
+    }
+
+    @Test
+    public void testSelectedRequestTabDefaultsToParamsAndNormalizesNull() {
+        EndpointModel endpoint = new EndpointModel();
+
+        Assert.assertEquals(RequestTab.PARAMS, endpoint.getSelectedRequestTab());
+
+        endpoint.setSelectedRequestTab(RequestTab.BODY);
+        Assert.assertEquals(RequestTab.BODY, endpoint.getSelectedRequestTab());
+
+        endpoint.setSelectedRequestTab(null);
+        Assert.assertEquals(RequestTab.PARAMS, endpoint.getSelectedRequestTab());
     }
 
     @Test

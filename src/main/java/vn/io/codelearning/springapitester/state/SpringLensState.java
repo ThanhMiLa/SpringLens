@@ -75,6 +75,34 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         return vn.io.codelearning.springapitester.model.EndpointIdentity.createKey(endpoint);
     }
 
+    /**
+     * Persists only the request-tab preference, without adding a duplicate response-history entry.
+     */
+    public void saveSelectedRequestTab(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
+        if (endpoint == null) return;
+
+        String key = getEndpointKey(endpoint);
+        EndpointSavedState saved = endpoint.isManual()
+                ? manualEndpoints.stream().filter(e -> e.id != null && e.id.equals(endpoint.getId())).findFirst().orElse(null)
+                : endpoints.get(key);
+        if (saved == null) {
+            saved = new EndpointSavedState();
+            if (endpoint.isManual()) {
+                saved.id = endpoint.getId();
+                saved.name = endpoint.getName();
+                saved.isManual = true;
+                saved.isAbsoluteUrl = endpoint.isAbsoluteUrl();
+                saved.folderId = endpoint.getFolderId();
+                saved.httpMethod = endpoint.getHttpMethod();
+                saved.path = endpoint.getPath();
+                manualEndpoints.add(saved);
+            }
+        }
+
+        saved.selectedRequestTab = endpoint.getSelectedRequestTab();
+        endpoints.put(key, saved);
+    }
+
     public void saveEndpoint(vn.io.codelearning.springapitester.model.EndpointModel endpoint) {
         if (endpoint == null) return;
         EndpointSavedState saved = new EndpointSavedState();
@@ -85,6 +113,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
                 ? endpoint.getRequestBodyJson()
                 : "";
         saved.bodyType = endpoint.getBodyType();
+        saved.selectedRequestTab = endpoint.getSelectedRequestTab();
         saved.allowInsecureTls = endpoint.isAllowInsecureTls();
         if (endpoint.getInsecureTlsConsent() != null) {
             saved.insecureTlsConsentHost = endpoint.getInsecureTlsConsent().getNormalizedHost();
@@ -339,6 +368,7 @@ public class SpringLensState implements PersistentStateComponent<SpringLensState
         
         // Migrate legacy NONE/null values to JSON; FORM_DATA remains an explicit user/scanner choice.
         endpoint.setBodyType(saved.bodyType);
+        endpoint.setSelectedRequestTab(saved.selectedRequestTab);
         endpoint.setAllowInsecureTls(saved.allowInsecureTls);
         if (saved.allowInsecureTls && saved.insecureTlsConsentHost != null && !saved.insecureTlsConsentHost.isEmpty()
                 && saved.insecureTlsConsentVersion == vn.io.codelearning.springapitester.client.InsecureTlsConsent.CURRENT_POLICY_VERSION

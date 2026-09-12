@@ -487,6 +487,16 @@ public class EndpointDetailPanel extends JPanel {
         requestTabs.addTab("Cookies", cookiesTabPanel);
         requestTabs.addTab("Auth", authPanel);
         requestTabs.addTab("Body", requestBodyPanel);
+        requestTabs.addChangeListener(e -> {
+            if (!isUpdatingUI && currentEndpoint != null) {
+                currentEndpoint.setSelectedRequestTab(requestTabForIndex(requestTabs.getSelectedIndex()));
+                vn.io.codelearning.springapitester.state.SpringLensState state =
+                        vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+                if (state != null) {
+                    state.saveSelectedRequestTab(currentEndpoint);
+                }
+            }
+        });
         
         mainSplitter.setFirstComponent(requestTabs);
         
@@ -587,6 +597,27 @@ public class EndpointDetailPanel extends JPanel {
         }
     }
 
+    static int requestTabIndex(vn.io.codelearning.springapitester.model.RequestTab requestTab) {
+        if (requestTab == null) return 0;
+        return switch (requestTab) {
+            case PARAMS -> 0;
+            case HEADERS -> 1;
+            case COOKIES -> 2;
+            case AUTH -> 3;
+            case BODY -> 4;
+        };
+    }
+
+    static vn.io.codelearning.springapitester.model.RequestTab requestTabForIndex(int index) {
+        return switch (index) {
+            case 1 -> vn.io.codelearning.springapitester.model.RequestTab.HEADERS;
+            case 2 -> vn.io.codelearning.springapitester.model.RequestTab.COOKIES;
+            case 3 -> vn.io.codelearning.springapitester.model.RequestTab.AUTH;
+            case 4 -> vn.io.codelearning.springapitester.model.RequestTab.BODY;
+            default -> vn.io.codelearning.springapitester.model.RequestTab.PARAMS;
+        };
+    }
+
     public void displayEndpoint(EndpointModel endpoint) {
         // Collect old data before switching
         collectDataToModel();
@@ -606,6 +637,7 @@ public class EndpointDetailPanel extends JPanel {
                 authPanel.setAuthConfig(new vn.io.codelearning.springapitester.model.AuthConfig());
                 authPanel.setSecuredStatus(false);
                 insecureTlsCheckBox.setSelected(false);
+                requestTabs.setSelectedIndex(requestTabIndex(vn.io.codelearning.springapitester.model.RequestTab.PARAMS));
                 ApplicationManager.getApplication().runWriteAction(() -> {
                     requestBodyEditor.getDocument().setText("");
                     responseBodyEditor.getDocument().setText("");
@@ -680,6 +712,8 @@ public class EndpointDetailPanel extends JPanel {
                 syncBtn.setVisible(true);
             }
 
+            requestTabs.setSelectedIndex(requestTabIndex(endpoint.getSelectedRequestTab()));
+
             // Restore or Reset Cached Response
             String respBody = endpoint.getLastResponseBody() != null ? endpoint.getLastResponseBody() : "";
             String respHeaders = endpoint.getLastResponseHeaders() != null ? endpoint.getLastResponseHeaders() : "";
@@ -729,6 +763,7 @@ public class EndpointDetailPanel extends JPanel {
 
     private void collectDataToModel() {
         if (currentEndpoint == null) return;
+        currentEndpoint.setSelectedRequestTab(requestTabForIndex(requestTabs.getSelectedIndex()));
         // Collect all parameters across panels while preserving unmanaged parameters
         java.util.List<ParameterModel> allParams = new java.util.ArrayList<>();
         if (currentEndpoint.getParameters() != null) {

@@ -29,6 +29,7 @@ public class EndpointModel {
     private String requestBodyClassFqn;
     // JSON is the deterministic default for JSON request bodies and endpoints without a body.
     private RequestBodyType bodyType = RequestBodyType.JSON;
+    private RequestTab selectedRequestTab = RequestTab.PARAMS;
     private String returnTypeClassFqn;    // Kiểu trả về của hàm (vd: ResponseEntity<UserDTO>)
     private String expectedResponseJson;  // JSON mẫu dự kiến sinh từ DTO trả về
     private AuthConfig authConfig;
@@ -212,6 +213,14 @@ public class EndpointModel {
         this.bodyType = bodyType == RequestBodyType.FORM_DATA
                 ? RequestBodyType.FORM_DATA
                 : RequestBodyType.JSON;
+    }
+
+    public RequestTab getSelectedRequestTab() {
+        return selectedRequestTab != null ? selectedRequestTab : RequestTab.PARAMS;
+    }
+
+    public void setSelectedRequestTab(RequestTab selectedRequestTab) {
+        this.selectedRequestTab = selectedRequestTab != null ? selectedRequestTab : RequestTab.PARAMS;
     }
 
     public void addParameter(ParameterModel param) {
