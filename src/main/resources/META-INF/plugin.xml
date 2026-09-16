@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.1.4</version>
+    <version>1.2.0</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
@@ -39,6 +39,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.2.0 — Endpoint Navigator File Filtering</h3>
+        <ul>
+            <li><b>Java File Filter:</b> Filter scanned APIs by their controller source file. The selector lists Java files, keeps the selected file after Reload when available, and offers an All files option to restore the full API list.</li>
+            <li><b>Responsive Navigator Controls:</b> The file selector has its own row, while New Collection, Clear Data, and Reload share a responsive three-column action row. Gateway mode remains on its own row.</li>
+        </ul>
         <h3>1.1.4 — Deterministic Request Setup & Navigation</h3>
         <ul>
             <li><b>Per-Endpoint Request Tab Memory:</b> SpringLens remembers each API's last request tab and restores it when you return, including after reload or IDE restart. New APIs open on Params by default.</li>

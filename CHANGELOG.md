@@ -2,6 +2,14 @@
 
 # SpringLens Changelog
 
+## [1.2.0] - 2026-09-16
+
+### Added
+- **Java Source File API Filter:** The Endpoint Navigator can now filter scanned APIs by controller `.java` file. It lists all discovered source files, keeps the selected file after Reload when available, and provides an **All files** option to restore the full API list. Filtering uses the full source path internally, so files with the same name remain distinct.
+
+### Changed
+- **Responsive Endpoint Navigator Controls:** Replaced the inactive search field with the Java source-file filter. The filter occupies its own row; **New Collection**, **Clear Data**, and **Reload** now share an equal-width responsive action row, while the Direct Services/API Gateway selector remains separate.
+
 ## [1.1.4] - 2026-09-12
 
 ### Fixed
