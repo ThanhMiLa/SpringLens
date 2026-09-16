@@ -1,7 +1,6 @@
 package vn.io.codelearning.springapitester.ui;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import vn.io.codelearning.springapitester.model.EndpointModel;
@@ -10,8 +9,10 @@ import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -21,14 +22,15 @@ public class EndpointTreePanel extends JPanel {
     private final Tree tree;
     private final DefaultTreeModel treeModel;
     private final DefaultMutableTreeNode rootNode;
-    private final SearchTextField searchField;
     private final JButton reloadBtn;
+    private final com.intellij.openapi.ui.ComboBox<SourceFileFilterOption> sourceFileComboBox;
 
     private List<EndpointModel> currentEndpoints;
     private final Consumer<EndpointModel> onEndpointSelected;
     private Runnable onReloadClicked;
     private Runnable onModeChanged;
     private com.intellij.openapi.ui.ComboBox<String> gatewayComboBox;
+    private boolean updatingSourceFileFilter;
 
     public EndpointTreePanel(Project project, Consumer<EndpointModel> onEndpointSelected, Runnable onReloadClicked) {
         this.project = project;
@@ -38,9 +40,7 @@ public class EndpointTreePanel extends JPanel {
         setLayout(new BorderLayout());
         setMinimumSize(new Dimension(100, 100));
 
-        // 1. Top Panel: Search + Reload Button
-        JPanel topPanel = new JPanel(new BorderLayout());
-        searchField = new SearchTextField();
+        // 1. Header: Source File Filter + Actions + Gateway Mode
         reloadBtn = new JButton("Reload");
         reloadBtn.addActionListener(e -> {
             if (this.onReloadClicked != null) {
@@ -48,10 +48,8 @@ public class EndpointTreePanel extends JPanel {
             }
         });
 
-        topPanel.add(searchField, BorderLayout.CENTER);
-        
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        
+        JPanel actionPanel = new JPanel(new GridLayout(1, 3, 4, 0));
+
         JButton addBtn = new JButton("+");
         addBtn.setToolTipText("New Collection");
         addBtn.addActionListener(e -> {
@@ -93,8 +91,12 @@ public class EndpointTreePanel extends JPanel {
         actionPanel.add(clearBtn);
         actionPanel.add(reloadBtn);
         
-        topPanel.add(actionPanel, BorderLayout.EAST);
-        
+        sourceFileComboBox = new com.intellij.openapi.ui.ComboBox<>();
+        sourceFileComboBox.addActionListener(e -> {
+            if (!updatingSourceFileFilter) {
+                updateEndpoints(currentEndpoints);
+            }
+        });
         gatewayComboBox = new com.intellij.openapi.ui.ComboBox<>(new String[]{"🎯 Direct Services", "🌐 API Gateway"});
         gatewayComboBox.setVisible(false);
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
@@ -110,11 +112,14 @@ public class EndpointTreePanel extends JPanel {
                 onModeChanged.run();
             }
         });
-        
+
         JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.add(topPanel, BorderLayout.NORTH);
-        headerPanel.add(gatewayComboBox, BorderLayout.SOUTH);
-        
+        headerPanel.add(sourceFileComboBox, BorderLayout.NORTH);
+
+        JPanel controlsPanel = new JPanel(new BorderLayout());
+        controlsPanel.add(actionPanel, BorderLayout.NORTH);
+        controlsPanel.add(gatewayComboBox, BorderLayout.SOUTH);
+        headerPanel.add(controlsPanel, BorderLayout.CENTER);
         add(headerPanel, BorderLayout.NORTH);
 
         // 2. Tree
@@ -249,7 +254,9 @@ public class EndpointTreePanel extends JPanel {
     }
 
     public void updateEndpoints(List<EndpointModel> endpoints) {
-        this.currentEndpoints = endpoints;
+        this.currentEndpoints = endpoints != null ? endpoints : Collections.emptyList();
+        updateSourceFileFilterOptions(this.currentEndpoints);
+        List<EndpointModel> filteredEndpoints = filterEndpointsBySourceFile(this.currentEndpoints, getSelectedSourceFilePath());
         rootNode.removeAllChildren();
 
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
@@ -283,7 +290,7 @@ public class EndpointTreePanel extends JPanel {
         }
 
         // 2. Build Scanned Controllers
-        if (endpoints != null && !endpoints.isEmpty()) {
+        if (!filteredEndpoints.isEmpty()) {
             boolean hasGateway = false;
             try {
                 com.intellij.openapi.module.Module[] modules = com.intellij.openapi.module.ModuleManager.getInstance(project).getModules();
@@ -300,11 +307,11 @@ public class EndpointTreePanel extends JPanel {
                 gatewayComboBox.setVisible(hasGateway);
             }
             
-            java.util.Set<String> moduleNames = endpoints.stream().map(e -> e.getModuleName() != null ? e.getModuleName() : "Unknown").collect(Collectors.toSet());
+            java.util.Set<String> moduleNames = filteredEndpoints.stream().map(e -> e.getModuleName() != null ? e.getModuleName() : "Unknown").collect(Collectors.toSet());
             boolean useModuleLevel = moduleNames.size() > 1 || hasGateway;
 
             if (useModuleLevel) {
-                Map<String, List<EndpointModel>> moduleGrouped = endpoints.stream()
+                Map<String, List<EndpointModel>> moduleGrouped = filteredEndpoints.stream()
                         .collect(Collectors.groupingBy(e -> e.getModuleName() != null ? e.getModuleName() : "Unknown"));
                 
                 for (Map.Entry<String, List<EndpointModel>> modEntry : moduleGrouped.entrySet()) {
@@ -326,7 +333,7 @@ public class EndpointTreePanel extends JPanel {
                     rootNode.add(moduleNode);
                 }
             } else {
-                Map<String, List<EndpointModel>> grouped = endpoints.stream()
+                Map<String, List<EndpointModel>> grouped = filteredEndpoints.stream()
                         .collect(Collectors.groupingBy(e -> 
                             (e.getControllerName() != null && !e.getControllerName().isEmpty()) ? e.getControllerName() : "Unknown"
                         ));
@@ -346,6 +353,78 @@ public class EndpointTreePanel extends JPanel {
         // Expand all
         for (int i = 0; i < tree.getRowCount(); i++) {
             tree.expandRow(i);
+        }
+    }
+
+    static List<EndpointModel> filterEndpointsBySourceFile(List<EndpointModel> endpoints, String sourceFilePath) {
+        if (endpoints == null || endpoints.isEmpty() || sourceFilePath == null) {
+            return endpoints != null ? endpoints : Collections.emptyList();
+        }
+
+        return endpoints.stream()
+                .filter(endpoint -> sourceFilePath.equals(getNormalizedSourceFilePath(endpoint)))
+                .collect(Collectors.toList());
+    }
+
+    private void updateSourceFileFilterOptions(List<EndpointModel> endpoints) {
+        String selectedSourceFilePath = getSelectedSourceFilePath();
+        List<String> sourceFilePaths = endpoints.stream()
+                .map(EndpointTreePanel::getNormalizedSourceFilePath)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+        if (selectedSourceFilePath != null && !sourceFilePaths.contains(selectedSourceFilePath)) {
+            selectedSourceFilePath = null;
+        }
+
+        updatingSourceFileFilter = true;
+        try {
+            sourceFileComboBox.removeAllItems();
+            sourceFileComboBox.addItem(new SourceFileFilterOption(null));
+            for (String sourceFilePath : sourceFilePaths) {
+                sourceFileComboBox.addItem(new SourceFileFilterOption(sourceFilePath));
+            }
+
+            for (int index = 0; index < sourceFileComboBox.getItemCount(); index++) {
+                SourceFileFilterOption option = sourceFileComboBox.getItemAt(index);
+                if (Objects.equals(option.sourceFilePath, selectedSourceFilePath)) {
+                    sourceFileComboBox.setSelectedIndex(index);
+                    break;
+                }
+            }
+        } finally {
+            updatingSourceFileFilter = false;
+        }
+    }
+
+    private String getSelectedSourceFilePath() {
+        SourceFileFilterOption selectedOption = (SourceFileFilterOption) sourceFileComboBox.getSelectedItem();
+        return selectedOption != null ? selectedOption.sourceFilePath : null;
+    }
+
+    private static String getNormalizedSourceFilePath(EndpointModel endpoint) {
+        String sourceFilePath = endpoint.getSourceFilePath();
+        return sourceFilePath != null ? sourceFilePath.trim() : "";
+    }
+
+    private static final class SourceFileFilterOption {
+        private final String sourceFilePath;
+
+        private SourceFileFilterOption(String sourceFilePath) {
+            this.sourceFilePath = sourceFilePath;
+        }
+
+        @Override
+        public String toString() {
+            if (sourceFilePath == null) {
+                return "All files";
+            }
+            if (sourceFilePath.isEmpty()) {
+                return "(Unknown file)";
+            }
+            int separatorIndex = Math.max(sourceFilePath.lastIndexOf('/'), sourceFilePath.lastIndexOf('\\'));
+            return separatorIndex >= 0 ? sourceFilePath.substring(separatorIndex + 1) : sourceFilePath;
         }
     }
     

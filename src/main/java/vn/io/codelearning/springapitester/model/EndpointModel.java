@@ -19,6 +19,7 @@ public class EndpointModel {
     private String path;
     private String controllerName;
     private String packageName;
+    private String sourceFilePath;
     private String methodName;
     private String methodSignature = "";
     private boolean isSecured;
@@ -55,6 +56,7 @@ public class EndpointModel {
         this.path = "";
         this.controllerName = "";
         this.packageName = "";
+        this.sourceFilePath = "";
         this.methodName = "";
         this.isSecured = false;
         this.isRestEndpoint = true;
@@ -114,6 +116,14 @@ public class EndpointModel {
 
     public void setPackageName(String packageName) {
         this.packageName = packageName;
+    }
+
+    public String getSourceFilePath() {
+        return sourceFilePath;
+    }
+
+    public void setSourceFilePath(String sourceFilePath) {
+        this.sourceFilePath = (sourceFilePath != null) ? sourceFilePath : "";
     }
 
     public String getMethodName() {

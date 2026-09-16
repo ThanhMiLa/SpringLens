@@ -58,6 +58,7 @@ public class SpringEndpointScanner {
         for (PsiClass controllerClass : controllerClasses) {
             String packageName = extractPackageName(controllerClass);
             String controllerName = controllerClass.getName();
+            String sourceFilePath = extractSourceFilePath(controllerClass);
             List<String> classPaths = extractClassBasePaths(controllerClass);
             boolean classIsRest = SpringAnnotationUtils.isRestController(controllerClass);
 
@@ -112,6 +113,7 @@ public class SpringEndpointScanner {
                     ep.setModuleName(moduleName);
                     ep.setDirectBaseUrl(directBaseUrl);
                     ep.setMethodSignature(signature);
+                    ep.setSourceFilePath(sourceFilePath);
                 }
                 result.addAll(methodEndpoints);
             }
@@ -377,6 +379,16 @@ public class SpringEndpointScanner {
             return javaFile.getPackageName();
         }
         return "default";
+    }
+
+    private String extractSourceFilePath(PsiClass psiClass) {
+        PsiFile file = psiClass.getContainingFile();
+        if (file == null) {
+            return "";
+        }
+
+        com.intellij.openapi.vfs.VirtualFile virtualFile = file.getVirtualFile();
+        return virtualFile != null ? virtualFile.getPath() : file.getName();
     }
 
 
