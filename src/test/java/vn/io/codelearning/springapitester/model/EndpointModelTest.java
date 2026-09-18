@@ -28,6 +28,10 @@ public class EndpointModelTest {
         Assert.assertEquals(ParamTypeEnum.MULTIPART_FILE, ParamTypeEnum.fromAnnotationOrType(null, "jakarta.servlet.http.Part"));
         Assert.assertEquals(ParamTypeEnum.FRAMEWORK_INTERNAL, ParamTypeEnum.fromAnnotationOrType(null, "jakarta.servlet.http.HttpServletRequest"));
         Assert.assertEquals(ParamTypeEnum.FRAMEWORK_INTERNAL, ParamTypeEnum.fromAnnotationOrType(null, "java.security.Principal"));
+        Assert.assertEquals(ParamTypeEnum.FRAMEWORK_INTERNAL,
+                ParamTypeEnum.fromAnnotationOrType("AuthenticationPrincipal", "org.springframework.security.oauth2.jwt.Jwt"));
+        Assert.assertEquals(ParamTypeEnum.FRAMEWORK_INTERNAL,
+                ParamTypeEnum.fromAnnotationOrType("CurrentSecurityContext", "org.springframework.security.core.context.SecurityContext"));
     }
 
     @Test

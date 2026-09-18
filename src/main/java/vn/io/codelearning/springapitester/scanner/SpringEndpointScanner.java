@@ -245,6 +245,11 @@ public class SpringEndpointScanner {
                 String qName = anno.getQualifiedName();
                 if (qName == null) continue;
 
+                if (qName.contains("AuthenticationPrincipal") || qName.contains("CurrentSecurityContext")) {
+                    annotationName = qName;
+                    break;
+                }
+
                 if (qName.contains("PathVariable") || qName.contains("RequestParam") ||
                     qName.contains("RequestHeader") || qName.contains("CookieValue") ||
                     qName.contains("RequestBody") || qName.contains("RequestPart") ||

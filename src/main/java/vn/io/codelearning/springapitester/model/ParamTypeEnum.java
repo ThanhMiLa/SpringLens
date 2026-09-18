@@ -43,6 +43,9 @@ public enum ParamTypeEnum {
      */
     public static ParamTypeEnum fromAnnotationOrType(String annotationName, String typeFqn) {
         if (annotationName != null && !annotationName.isBlank()) {
+            if (annotationName.contains("AuthenticationPrincipal") || annotationName.contains("CurrentSecurityContext")) {
+                return FRAMEWORK_INTERNAL;
+            }
             if (annotationName.contains("PathVariable")) return PATH_VARIABLE;
             if (annotationName.contains("RequestParam")) {
                 if (isMultipartFileType(typeFqn)) return MULTIPART_FILE;
