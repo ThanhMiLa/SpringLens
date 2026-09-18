@@ -2,6 +2,19 @@
 
 # SpringLens Changelog
 
+## [1.2.1] - 2026-09-18
+
+### Changed
+- **Live Request URL Synchronization:** Enabled query parameters with non-empty values now appear immediately in the request URL. Existing manual query parameters and URL fragments are preserved, while parameter names and values are encoded safely without duplicate entries or trailing separators.
+- **Flexible Path Variable Input:** Path variables can now be supplied either through the Params table or by replacing the placeholder directly in the URL. Once a placeholder is replaced in the URL, its redundant Params row is hidden and restored automatically if the placeholder is added back.
+
+### Fixed
+- **EDT-Safe Spring Configuration Resolution:** Eliminated IntelliJ `Slow operations are prohibited on EDT` errors when selecting endpoints after configuration cache invalidation. Spring configuration and file-index scanning now run in cancellable background smart read actions, while the UI consumes precomputed per-module metadata without blocking the event dispatch thread.
+- **Stale Configuration Scan Protection:** Added generation-aware configuration caching and reload guards so results from superseded background scans cannot overwrite newer configuration or endpoint data.
+- **Spring Security Parameter Detection:** Parameters injected through `@AuthenticationPrincipal` or `@CurrentSecurityContext` are now treated as framework internals instead of being expanded into incorrect query parameters such as `headers`, `claims`, `tokenValue`, `issuedAt`, and `expiresAt`.
+- **Resolved Path Variable Validation:** Fixed false `Missing required path variable` errors when a required placeholder had already been replaced directly in the request URL.
+- **Idempotent Query URL Assembly:** Prevented query parameters already visible in the URL from being appended again when sending requests or exporting cURL, PowerShell, and Windows CMD commands.
+
 ## [1.2.0] - 2026-09-16
 
 ### Added

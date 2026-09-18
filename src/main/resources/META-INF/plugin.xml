@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
@@ -39,6 +39,13 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.2.1 — Request URL & Parameter Handling</h3>
+        <ul>
+            <li><b>Live Query URL Synchronization:</b> Enabled query parameters with values now appear in the request URL with safe encoding, correct separators, and no duplicate entries.</li>
+            <li><b>Flexible Path Variable Input:</b> Path variables can be entered through Params or replaced directly in the URL. Resolved placeholders no longer trigger missing-value errors, and redundant path-variable rows are hidden automatically.</li>
+            <li><b>Spring Security Parameter Filtering:</b> Parameters injected through <code>@AuthenticationPrincipal</code> and <code>@CurrentSecurityContext</code> are excluded from request Params instead of being expanded into JWT implementation fields.</li>
+            <li><b>Consistent Request Exports:</b> Request sending and cURL, PowerShell, and Windows CMD exports share the same idempotent query URL assembly.</li>
+        </ul>
         <h3>1.2.0 — Endpoint Navigator File Filtering</h3>
         <ul>
             <li><b>Java File Filter:</b> Filter scanned APIs by their controller source file. The selector lists Java files, keeps the selected file after Reload when available, and offers an All files option to restore the full API list.</li>
