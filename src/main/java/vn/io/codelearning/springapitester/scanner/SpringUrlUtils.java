@@ -76,6 +76,14 @@ public final class SpringUrlUtils {
         return url.replaceAll(pattern, Matcher.quoteReplacement(val));
     }
 
+    public static boolean containsPathVariable(String url, String paramName) {
+        if (paramName == null || paramName.isBlank()) {
+            return false;
+        }
+        return extractPathVariableNames(url).stream()
+                .anyMatch(name -> name.equalsIgnoreCase(paramName));
+    }
+
     /**
      * Kiểm tra xem URL còn chứa Path Variable nào chưa được điền giá trị hay không.
      */

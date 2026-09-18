@@ -63,6 +63,14 @@ public class SpringUrlUtilsTest {
         Assert.assertEquals("/users/", SpringUrlUtils.replacePathVariable("/users/{id}", "id", null));
     }
 
+    public void testContainsPathVariable() {
+        Assert.assertTrue(SpringUrlUtils.containsPathVariable("/users/{userId}", "userId"));
+        Assert.assertTrue(SpringUrlUtils.containsPathVariable("/users/%7BuserId%7D", "USERID"));
+        Assert.assertTrue(SpringUrlUtils.containsPathVariable("/users/{userId:[0-9]+}", "userId"));
+        Assert.assertFalse(SpringUrlUtils.containsPathVariable("/users/123", "userId"));
+        Assert.assertFalse(SpringUrlUtils.containsPathVariable("/users/{userId}", null));
+    }
+
     @Test
     public void testHasUnresolvedPathVariables() {
         Assert.assertTrue(SpringUrlUtils.hasUnresolvedPathVariables("/users/{id}"));

@@ -5,6 +5,7 @@ import vn.io.codelearning.springapitester.model.ParameterModel;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,12 +13,18 @@ import java.util.List;
 public class ParamTablePanel extends JPanel {
     private final JBTable table;
     private final ParamTableModel tableModel;
+    private final TableRowSorter<ParamTableModel> rowSorter;
     private Runnable onParametersChanged;
 
     public ParamTablePanel(java.util.List<vn.io.codelearning.springapitester.model.ParamTypeEnum> allowedTypes) {
         setLayout(new BorderLayout());
         tableModel = new ParamTableModel(allowedTypes);
         table = new JBTable(tableModel);
+        rowSorter = new TableRowSorter<>(tableModel);
+        for (int column = 0; column < tableModel.getColumnCount(); column++) {
+            rowSorter.setSortable(column, false);
+        }
+        table.setRowSorter(rowSorter);
         table.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
         tableModel.addTableModelListener(event -> notifyParametersChanged());
         
@@ -105,9 +112,12 @@ public class ParamTablePanel extends JPanel {
         
         decorator.setRemoveAction(button -> {
             int selectedRow = table.getSelectedRow();
-            if (selectedRow >= 0 && selectedRow < tableModel.params.size()) {
-                tableModel.params.remove(selectedRow);
-                tableModel.fireTableRowsDeleted(selectedRow, selectedRow);
+            if (selectedRow >= 0) {
+                int modelRow = table.convertRowIndexToModel(selectedRow);
+                if (modelRow < tableModel.params.size()) {
+                    tableModel.params.remove(modelRow);
+                    tableModel.fireTableRowsDeleted(modelRow, modelRow);
+                }
             }
         });
         
@@ -124,6 +134,18 @@ public class ParamTablePanel extends JPanel {
 
     public void setOnParametersChanged(Runnable onParametersChanged) {
         this.onParametersChanged = onParametersChanged;
+    }
+
+    public void updatePathVariableVisibility(String url) {
+        rowSorter.setRowFilter(new RowFilter<>() {
+            @Override
+            public boolean include(Entry<? extends ParamTableModel, ? extends Integer> entry) {
+                ParameterModel parameter = entry.getModel().getParameter(entry.getIdentifier());
+                return parameter.getParamType() != vn.io.codelearning.springapitester.model.ParamTypeEnum.PATH_VARIABLE
+                        || vn.io.codelearning.springapitester.scanner.SpringUrlUtils.containsPathVariable(
+                                url, parameter.getName());
+            }
+        });
     }
 
     public void stopEditing() {
@@ -163,6 +185,10 @@ public class ParamTablePanel extends JPanel {
 
         public List<ParameterModel> getParams() {
             return params;
+        }
+
+        public ParameterModel getParameter(int rowIndex) {
+            return params.get(rowIndex);
         }
 
         @Override

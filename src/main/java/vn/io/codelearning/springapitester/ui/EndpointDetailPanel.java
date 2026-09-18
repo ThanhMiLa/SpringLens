@@ -169,6 +169,7 @@ public class EndpointDetailPanel extends JPanel {
             private void update() {
                 if (!isUpdatingUI && !isUpdatingUrlPreview && currentEndpoint != null) {
                     String url = urlField.getText().trim();
+                    paramPanel.updatePathVariableVisibility(url);
                     String urlForPersistence = QueryParameterUrlBuilder.removeQueryParameters(
                             url, currentEndpoint.getParameters());
                     if (vn.io.codelearning.springapitester.util.ManualUrlResolver.isAbsoluteUrl(urlForPersistence)) {
@@ -696,6 +697,7 @@ public class EndpointDetailPanel extends JPanel {
             }
 
             paramPanel.setParameters(endpoint.getParameters());
+            paramPanel.updatePathVariableVisibility(urlField.getText());
             headerParamPanel.setParameters(endpoint.getParameters());
             cookiePanel.setParameters(endpoint.getParameters());
             formDataPanel.setParameters(endpoint.getParameters());

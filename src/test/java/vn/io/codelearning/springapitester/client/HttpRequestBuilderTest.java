@@ -28,6 +28,34 @@ public class HttpRequestBuilderTest {
     }
 
     @Test
+    public void testBuildRequestAcceptsPathVariableReplacedDirectlyInUrl() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/users/{userId}", "UserController", "com.example", "getUser");
+        ParameterModel userId = new ParameterModel(
+                "userId", ParamTypeEnum.PATH_VARIABLE, "UUID", "", true, "", "");
+        endpoint.addParameter(userId);
+
+        Request request = HttpRequestBuilder.buildRequest(
+                endpoint,
+                "http://localhost:8888/identity/users/0172ce4d-f6f2-4ff3-a20b-2c438ab10f1b"
+        );
+
+        Assert.assertEquals(
+                "http://localhost:8888/identity/users/0172ce4d-f6f2-4ff3-a20b-2c438ab10f1b",
+                request.url().toString()
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testBuildRequestRejectsUnresolvedRequiredPathVariable() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/users/{userId}", "UserController", "com.example", "getUser");
+        ParameterModel userId = new ParameterModel(
+                "userId", ParamTypeEnum.PATH_VARIABLE, "UUID", "", true, "", "");
+        endpoint.addParameter(userId);
+
+        HttpRequestBuilder.buildRequest(endpoint, "http://localhost:8888/identity/users/{userId}");
+    }
+
+    @Test
     public void testBuildRequestDoesNotDuplicateQueryParametersAlreadyShownInUrl() {
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/posts", "PostController", "com.example", "getPosts");
         ParameterModel page = new ParameterModel("page", ParamTypeEnum.QUERY_PARAM, "Integer");

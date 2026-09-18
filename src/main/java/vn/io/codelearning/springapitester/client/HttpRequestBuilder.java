@@ -7,6 +7,7 @@ import okhttp3.RequestBody;
 import okhttp3.MultipartBody;
 import okhttp3.Headers;
 import vn.io.codelearning.springapitester.model.*;
+import vn.io.codelearning.springapitester.scanner.SpringUrlUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -27,10 +28,13 @@ public class HttpRequestBuilder {
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
                 String value = RequestValidationUtil.resolveParamValue(param);
-                if (param.isRequired() && value.trim().isEmpty()) {
+                boolean placeholderPresent = SpringUrlUtils.containsPathVariable(urlPath, param.getName());
+                if (param.isRequired() && value.trim().isEmpty() && placeholderPresent) {
                     throw new IllegalArgumentException("Missing required path variable: " + param.getName());
                 }
-                urlPath = vn.io.codelearning.springapitester.scanner.SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
+                if (!value.trim().isEmpty()) {
+                    urlPath = SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
+                }
             }
         }
 
