@@ -28,6 +28,24 @@ public class HttpRequestBuilderTest {
     }
 
     @Test
+    public void testBuildRequestDoesNotDuplicateQueryParametersAlreadyShownInUrl() {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/posts", "PostController", "com.example", "getPosts");
+        ParameterModel page = new ParameterModel("page", ParamTypeEnum.QUERY_PARAM, "Integer");
+        page.setCurrentValue("1");
+        ParameterModel size = new ParameterModel("size", ParamTypeEnum.QUERY_PARAM, "Integer");
+        size.setCurrentValue("10");
+        endpoint.addParameter(page);
+        endpoint.addParameter(size);
+
+        Request request = HttpRequestBuilder.buildRequest(
+                endpoint,
+                "http://localhost:8080/posts?page=1&size=10"
+        );
+
+        Assert.assertEquals("http://localhost:8080/posts?page=1&size=10", request.url().toString());
+    }
+
+    @Test
     public void testBuildPostWithJsonBody() throws IOException {
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.POST, "/api/v1/users", "UserController", "com.example", "createUser");
         endpoint.setBodyType(RequestBodyType.JSON);

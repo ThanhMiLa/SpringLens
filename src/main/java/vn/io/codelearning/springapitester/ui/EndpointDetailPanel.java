@@ -12,6 +12,7 @@ import com.intellij.ui.components.JBTextField;
 import okhttp3.Request;
 import vn.io.codelearning.springapitester.client.HttpClientService;
 import vn.io.codelearning.springapitester.client.HttpRequestBuilder;
+import vn.io.codelearning.springapitester.client.QueryParameterUrlBuilder;
 import vn.io.codelearning.springapitester.generator.DtoJsonGenerator;
 import vn.io.codelearning.springapitester.model.EndpointIdentity;
 import vn.io.codelearning.springapitester.model.EndpointModel;
@@ -64,6 +65,7 @@ public class EndpointDetailPanel extends JPanel {
     private java.util.function.Consumer<vn.io.codelearning.springapitester.model.AuthConfig> onApplyToAllAuth;
 
     private boolean isUpdatingUI = false;
+    private boolean isUpdatingUrlPreview = false;
     private volatile boolean disposed = false;
     private final vn.io.codelearning.springapitester.client.RequestExecutionTracker requestTracker =
             new vn.io.codelearning.springapitester.client.RequestExecutionTracker();
@@ -165,16 +167,18 @@ public class EndpointDetailPanel extends JPanel {
         urlField = new JBTextField();
         urlField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             private void update() {
-                if (!isUpdatingUI && currentEndpoint != null) {
+                if (!isUpdatingUI && !isUpdatingUrlPreview && currentEndpoint != null) {
                     String url = urlField.getText().trim();
-                    if (vn.io.codelearning.springapitester.util.ManualUrlResolver.isAbsoluteUrl(url)) {
+                    String urlForPersistence = QueryParameterUrlBuilder.removeQueryParameters(
+                            url, currentEndpoint.getParameters());
+                    if (vn.io.codelearning.springapitester.util.ManualUrlResolver.isAbsoluteUrl(urlForPersistence)) {
                         currentEndpoint.setAbsoluteUrl(true);
-                        currentEndpoint.setPath(url);
+                        currentEndpoint.setPath(urlForPersistence);
                     } else {
                         currentEndpoint.setAbsoluteUrl(false);
                         String effectiveBaseUrl = getEffectiveBaseUrl(currentEndpoint);
                         String relativePath = vn.io.codelearning.springapitester.util.ManualUrlResolver
-                                .extractRelativePathAndQuery(url, effectiveBaseUrl);
+                                .extractRelativePathAndQuery(urlForPersistence, effectiveBaseUrl);
                         currentEndpoint.setPath(relativePath);
                     }
                     if (currentEndpoint.getInsecureTlsConsent() != null) {
@@ -363,6 +367,7 @@ public class EndpointDetailPanel extends JPanel {
             vn.io.codelearning.springapitester.model.ParamTypeEnum.PATH_VARIABLE,
             vn.io.codelearning.springapitester.model.ParamTypeEnum.QUERY_PARAM
         ));
+        paramPanel.setOnParametersChanged(this::updateUrlPreview);
         headerParamPanel = new ParamTablePanel(java.util.List.of(
             vn.io.codelearning.springapitester.model.ParamTypeEnum.HEADER
         ));
@@ -671,7 +676,7 @@ public class EndpointDetailPanel extends JPanel {
             String effectiveBaseUrl = getEffectiveBaseUrl(endpoint);
             String fullUrl = vn.io.codelearning.springapitester.util.UrlResolutionUtil.resolveFullUrl(
                     effectiveBaseUrl, endpoint.getPath(), endpoint.isAbsoluteUrl());
-            urlField.setText(fullUrl);
+            urlField.setText(QueryParameterUrlBuilder.applyQueryParameters(fullUrl, endpoint.getParameters()));
 
             vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService configService =
                     project != null && !project.isDisposed() ? vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.getInstance(project) : null;
@@ -763,6 +768,10 @@ public class EndpointDetailPanel extends JPanel {
 
     private void collectDataToModel() {
         if (currentEndpoint == null) return;
+        paramPanel.stopEditing();
+        headerParamPanel.stopEditing();
+        cookiePanel.stopEditing();
+        formDataPanel.stopEditing();
         currentEndpoint.setSelectedRequestTab(requestTabForIndex(requestTabs.getSelectedIndex()));
         // Collect all parameters across panels while preserving unmanaged parameters
         java.util.List<ParameterModel> allParams = new java.util.ArrayList<>();
@@ -793,6 +802,25 @@ public class EndpointDetailPanel extends JPanel {
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
         if (state != null) {
             state.saveEndpoint(currentEndpoint);
+        }
+    }
+
+    private void updateUrlPreview() {
+        if (isUpdatingUI || currentEndpoint == null) {
+            return;
+        }
+
+        String previewUrl = QueryParameterUrlBuilder.applyQueryParameters(
+                urlField.getText(), paramPanel.getParameters());
+        if (previewUrl.equals(urlField.getText())) {
+            return;
+        }
+
+        isUpdatingUrlPreview = true;
+        try {
+            urlField.setText(previewUrl);
+        } finally {
+            isUpdatingUrlPreview = false;
         }
     }
 

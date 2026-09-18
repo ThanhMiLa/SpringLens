@@ -12,11 +12,14 @@ import java.util.List;
 public class ParamTablePanel extends JPanel {
     private final JBTable table;
     private final ParamTableModel tableModel;
+    private Runnable onParametersChanged;
 
     public ParamTablePanel(java.util.List<vn.io.codelearning.springapitester.model.ParamTypeEnum> allowedTypes) {
         setLayout(new BorderLayout());
         tableModel = new ParamTableModel(allowedTypes);
         table = new JBTable(tableModel);
+        table.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
+        tableModel.addTableModelListener(event -> notifyParametersChanged());
         
         // Column 0: Checkbox (Enabled)
         // Column 1: Param name
@@ -117,6 +120,22 @@ public class ParamTablePanel extends JPanel {
 
     public List<ParameterModel> getParameters() {
         return tableModel.getParams();
+    }
+
+    public void setOnParametersChanged(Runnable onParametersChanged) {
+        this.onParametersChanged = onParametersChanged;
+    }
+
+    public void stopEditing() {
+        if (table.isEditing()) {
+            table.getCellEditor().stopCellEditing();
+        }
+    }
+
+    private void notifyParametersChanged() {
+        if (onParametersChanged != null) {
+            onParametersChanged.run();
+        }
     }
 
     private static class ParamTableModel extends AbstractTableModel {

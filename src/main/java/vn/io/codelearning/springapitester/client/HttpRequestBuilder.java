@@ -34,24 +34,22 @@ public class HttpRequestBuilder {
             }
         }
 
-        HttpUrl parsedUrl = HttpUrl.parse(urlPath);
-        if (parsedUrl == null) {
-            throw new IllegalArgumentException("Invalid URL: " + urlPath);
-        }
-        HttpUrl.Builder urlBuilder = parsedUrl.newBuilder();
-
-        // 2. Gắn Query Params (?key=value)
+        // 2. Validate and apply Query Params (?key=value)
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.QUERY_PARAM && param.isEnabled()) {
                 String value = RequestValidationUtil.resolveParamValue(param);
                 if (param.isRequired() && value.trim().isEmpty()) {
                     throw new IllegalArgumentException("Missing required query parameter: " + param.getName());
                 }
-                if (!value.trim().isEmpty()) {
-                    urlBuilder.addQueryParameter(param.getName(), value);
-                }
             }
         }
+
+        urlPath = QueryParameterUrlBuilder.applyQueryParameters(urlPath, endpoint.getParameters());
+        HttpUrl parsedUrl = HttpUrl.parse(urlPath);
+        if (parsedUrl == null) {
+            throw new IllegalArgumentException("Invalid URL: " + urlPath);
+        }
+        HttpUrl.Builder urlBuilder = parsedUrl.newBuilder();
 
         // 3. Precedence: Auth headers > explicit @RequestHeader params > Custom Headers tab
         java.util.Map<String, java.util.List<String>> customHeadersMap = new java.util.LinkedHashMap<>();
