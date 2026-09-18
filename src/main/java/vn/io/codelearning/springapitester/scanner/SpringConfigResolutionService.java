@@ -2,12 +2,13 @@ package vn.io.codelearning.springapitester.scanner;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -27,6 +28,7 @@ import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,8 +42,11 @@ public class SpringConfigResolutionService implements Disposable {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     private final Project project;
-    private final Map<String, SpringServerConfig> serverConfigCache = new ConcurrentHashMap<>();
-    private final Map<String, GatewayConfig> gatewayConfigCache = new ConcurrentHashMap<>();
+    private final Map<String, CacheEntry<SpringServerConfig>> serverConfigCache = new ConcurrentHashMap<>();
+    private final Map<String, CacheEntry<GatewayConfig>> gatewayConfigCache = new ConcurrentHashMap<>();
+    private final AtomicLong cacheGeneration = new AtomicLong();
+
+    private record CacheEntry<T>(long generation, T value) {}
 
     public SpringConfigResolutionService(@NotNull Project project) {
         this.project = project;
@@ -75,6 +80,7 @@ public class SpringConfigResolutionService implements Disposable {
     }
 
     public void invalidateCache() {
+        cacheGeneration.incrementAndGet();
         serverConfigCache.clear();
         gatewayConfigCache.clear();
     }
@@ -88,24 +94,52 @@ public class SpringConfigResolutionService implements Disposable {
         return resolveServerConfig(null);
     }
 
+    /**
+     * Resolves server configuration from project indexes and must run on a background thread.
+     */
     public SpringServerConfig resolveServerConfig(@Nullable Module module) {
+        assertBackgroundThread();
         String cacheKey = module != null ? module.getName() : "__project__";
-        SpringServerConfig cached = serverConfigCache.get(cacheKey);
-        if (cached != null) return cached;
+        while (!project.isDisposed()) {
+            long generation = cacheGeneration.get();
+            CacheEntry<SpringServerConfig> cached = serverConfigCache.get(cacheKey);
+            if (cached != null && cached.generation() == generation) return cached.value();
 
-        SpringServerConfig config = readServerConfigInternal(module);
-        serverConfigCache.put(cacheKey, config);
-        return config;
+            SpringServerConfig config = readServerConfigInternal(module);
+            if (generation == cacheGeneration.get()) {
+                CacheEntry<SpringServerConfig> entry = new CacheEntry<>(generation, config);
+                serverConfigCache.put(cacheKey, entry);
+                return config;
+            }
+        }
+        return new SpringServerConfig();
     }
 
+    /**
+     * Resolves Gateway configuration from project indexes and must run on a background thread.
+     */
     public GatewayConfig resolveGatewayConfig() {
+        assertBackgroundThread();
         String cacheKey = "__project__";
-        GatewayConfig cached = gatewayConfigCache.get(cacheKey);
-        if (cached != null) return cached;
+        while (!project.isDisposed()) {
+            long generation = cacheGeneration.get();
+            CacheEntry<GatewayConfig> cached = gatewayConfigCache.get(cacheKey);
+            if (cached != null && cached.generation() == generation) return cached.value();
 
-        GatewayConfig config = readGatewayConfigInternal();
-        gatewayConfigCache.put(cacheKey, config);
-        return config;
+            GatewayConfig config = readGatewayConfigInternal();
+            if (generation == cacheGeneration.get()) {
+                CacheEntry<GatewayConfig> entry = new CacheEntry<>(generation, config);
+                gatewayConfigCache.put(cacheKey, entry);
+                return config;
+            }
+        }
+        return new GatewayConfig();
+    }
+
+    private void assertBackgroundThread() {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            throw new IllegalStateException("Spring configuration resolution must run on a background thread");
+        }
     }
 
     private SpringServerConfig readServerConfigInternal(@Nullable Module targetModule) {
@@ -116,16 +150,19 @@ public class SpringConfigResolutionService implements Disposable {
             if (ApplicationManager.getApplication().isReadAccessAllowed()) {
                 doReadServerConfig(targetModule, config);
             } else {
-                ApplicationManager.getApplication().runReadAction(
-                        (Computable<Void>) () -> {
+                ReadAction.nonBlocking(() -> {
                             doReadServerConfig(targetModule, config);
                             return null;
-                        }
-                );
+                        })
+                        .inSmartMode(project)
+                        .expireWith(project)
+                        .executeSynchronously();
             }
-        } catch (Throwable t) {
-            LOG.warn("Failed to read server config: " + t.getMessage(), t);
-            config.addDiagnostic("Error reading server config: " + t.getMessage());
+        } catch (ProcessCanceledException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            LOG.warn("Failed to read server config: " + exception.getMessage(), exception);
+            config.addDiagnostic("Error reading server config: " + exception.getMessage());
         }
 
         return config;
@@ -224,16 +261,19 @@ public class SpringConfigResolutionService implements Disposable {
             if (ApplicationManager.getApplication().isReadAccessAllowed()) {
                 doReadGatewayConfig(config);
             } else {
-                ApplicationManager.getApplication().runReadAction(
-                        (Computable<Void>) () -> {
+                ReadAction.nonBlocking(() -> {
                             doReadGatewayConfig(config);
                             return null;
-                        }
-                );
+                        })
+                        .inSmartMode(project)
+                        .expireWith(project)
+                        .executeSynchronously();
             }
-        } catch (Throwable t) {
-            LOG.warn("Failed to read gateway config: " + t.getMessage(), t);
-            config.diagnostics.add("Error reading gateway config: " + t.getMessage());
+        } catch (ProcessCanceledException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            LOG.warn("Failed to read gateway config: " + exception.getMessage(), exception);
+            config.diagnostics.add("Error reading gateway config: " + exception.getMessage());
         }
 
         return config;
@@ -245,6 +285,7 @@ public class SpringConfigResolutionService implements Disposable {
         for (Module m : modules) {
             if (m != null && !m.isDisposed() && vn.io.codelearning.springapitester.util.GatewayConfigReader.hasGatewayDependency(m)) {
                 gatewayModule = m;
+                config.gatewayDetected = true;
                 break;
             }
         }
@@ -301,8 +342,10 @@ public class SpringConfigResolutionService implements Disposable {
                             parseGatewayYamlDocument(doc, config, accumulatedProps);
                         }
                     }
-                } catch (Exception e) {
-                    config.diagnostics.add("Error parsing YAML file " + vf.getName() + ": " + e.getMessage());
+                } catch (ProcessCanceledException exception) {
+                    throw exception;
+                } catch (Exception exception) {
+                    config.diagnostics.add("Error parsing YAML file " + vf.getName() + ": " + exception.getMessage());
                 }
             }
         }
@@ -702,11 +745,13 @@ public class SpringConfigResolutionService implements Disposable {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (ProcessCanceledException exception) {
+            throw exception;
+        } catch (Exception exception) {
             if (diagnostics != null) {
-                diagnostics.add("Failed to parse config file " + file.getName() + ": " + e.getMessage());
+                diagnostics.add("Failed to parse config file " + file.getName() + ": " + exception.getMessage());
             }
-            LOG.warn("Failed to parse " + file.getPath() + ": " + e.getMessage());
+            LOG.warn("Failed to parse " + file.getPath() + ": " + exception.getMessage());
         }
 
         return result;

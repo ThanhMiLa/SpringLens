@@ -36,6 +36,7 @@ public class EndpointModel {
     private AuthConfig authConfig;
     private String moduleName;            // Service chứa endpoint
     private String directBaseUrl;         // URL gọi trực tiếp (http://localhost:8081)
+    private transient ServerConfigMetadata serverConfigMetadata;
     private boolean allowInsecureTls = false;
     private transient vn.io.codelearning.springapitester.client.InsecureTlsConsent insecureTlsConsent;
 
@@ -339,6 +340,14 @@ public class EndpointModel {
 
     public void setDirectBaseUrl(String directBaseUrl) {
         this.directBaseUrl = directBaseUrl;
+    }
+
+    public ServerConfigMetadata getServerConfigMetadata() {
+        return serverConfigMetadata;
+    }
+
+    public void setServerConfigMetadata(ServerConfigMetadata serverConfigMetadata) {
+        this.serverConfigMetadata = serverConfigMetadata;
     }
 
     public boolean isAllowInsecureTls() {

@@ -18,6 +18,7 @@ import vn.io.codelearning.springapitester.model.EndpointIdentity;
 import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.model.ParameterModel;
 import vn.io.codelearning.springapitester.model.ParamTypeEnum;
+import vn.io.codelearning.springapitester.model.ServerConfigMetadata;
 
 import javax.swing.*;
 import java.awt.*;
@@ -95,28 +96,6 @@ public class EndpointDetailPanel extends JPanel {
         }
     }
 
-    public void refreshGatewayConfigAsync() {
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            try {
-                vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig config = 
-                        vn.io.codelearning.springapitester.util.GatewayConfigReader.findGatewayConfig(project);
-                vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService configService =
-                        project != null && !project.isDisposed() ? vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.getInstance(project) : null;
-                String extractedBase = configService != null
-                        ? configService.resolveServerConfig().getBaseUrl()
-                        : vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
-                final String finalBase = extractedBase;
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    if (project.isDisposed()) return;
-                    this.cachedGatewayConfig = config;
-                    setDefaultBaseUrl(finalBase);
-                });
-            } catch (Throwable t) {
-                // ignore
-            }
-        });
-    }
-
     public EndpointDetailPanel(Project project) {
         this.project = project;
         Disposer.register(project, () -> {
@@ -129,9 +108,6 @@ public class EndpointDetailPanel extends JPanel {
         });
         setLayout(new BorderLayout());
         setMinimumSize(new Dimension(100, 100));
-
-        // Asynchronously load initial base URL and gateway config
-        refreshGatewayConfigAsync();
 
         // 1. Top Bar
         JPanel topBar = new JPanel(new BorderLayout(5, 5));
@@ -624,6 +600,27 @@ public class EndpointDetailPanel extends JPanel {
         };
     }
 
+    static String serverConfigTooltip(EndpointModel endpoint) {
+        if (endpoint == null || endpoint.isAbsoluteUrl() || endpoint.isManual()) {
+            return null;
+        }
+
+        ServerConfigMetadata metadata = endpoint.getServerConfigMetadata();
+        if (metadata == null) {
+            return null;
+        }
+        if (metadata.unresolvedPlaceholder()) {
+            return "Warning: Configuration has unresolved placeholders; fallback port used.";
+        }
+        if (metadata.fallback()) {
+            return "Info: Default fallback port used (no server.port configured).";
+        }
+        if (!metadata.sourceFile().isBlank()) {
+            return "Resolved from: " + metadata.sourceFile();
+        }
+        return null;
+    }
+
     public void displayEndpoint(EndpointModel endpoint) {
         // Collect old data before switching
         collectDataToModel();
@@ -635,6 +632,7 @@ public class EndpointDetailPanel extends JPanel {
             try {
                 methodComboBox.setSelectedItem(vn.io.codelearning.springapitester.model.HttpMethodEnum.GET);
                 urlField.setText("");
+                urlField.setToolTipText(null);
                 paramPanel.setParameters(new java.util.ArrayList<>());
                 headerParamPanel.setParameters(new java.util.ArrayList<>());
                 cookiePanel.setParameters(new java.util.ArrayList<>());
@@ -679,22 +677,7 @@ public class EndpointDetailPanel extends JPanel {
                     effectiveBaseUrl, endpoint.getPath(), endpoint.isAbsoluteUrl());
             urlField.setText(QueryParameterUrlBuilder.applyQueryParameters(fullUrl, endpoint.getParameters()));
 
-            vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService configService =
-                    project != null && !project.isDisposed() ? vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.getInstance(project) : null;
-            if (configService != null && !endpoint.isAbsoluteUrl() && !endpoint.isManual()) {
-                vn.io.codelearning.springapitester.scanner.SpringServerConfig serverConfig = configService.resolveServerConfig();
-                if (serverConfig != null) {
-                    if (serverConfig.hasUnresolvedPlaceholder()) {
-                        urlField.setToolTipText("Warning: Configuration has unresolved placeholders; fallback port used.");
-                    } else if (serverConfig.isFallback()) {
-                        urlField.setToolTipText("Info: Default fallback port used (no server.port configured).");
-                    } else {
-                        urlField.setToolTipText("Resolved from: " + serverConfig.getSourceFile());
-                    }
-                }
-            } else {
-                urlField.setToolTipText(null);
-            }
+            urlField.setToolTipText(serverConfigTooltip(endpoint));
 
             paramPanel.setParameters(endpoint.getParameters());
             paramPanel.updatePathVariableVisibility(urlField.getText());

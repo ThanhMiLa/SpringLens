@@ -1,5 +1,6 @@
 package vn.io.codelearning.springapitester.scanner;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.model.ParamTypeEnum;
@@ -8,7 +9,7 @@ import java.util.List;
 
 public class SpringEndpointScannerSecurityParameterTest extends BasePlatformTestCase {
 
-    public void testScannerSkipsSecurityInjectedParameters() {
+    public void testScannerSkipsSecurityInjectedParameters() throws Exception {
         addAnnotations();
         myFixture.addFileToProject("org/springframework/security/oauth2/jwt/Jwt.java", """
                 package org.springframework.security.oauth2.jwt;
@@ -40,7 +41,9 @@ public class SpringEndpointScannerSecurityParameterTest extends BasePlatformTest
                 }
                 """);
 
-        List<EndpointModel> endpoints = SpringEndpointScanner.getInstance().scanEndpoints(getProject());
+        List<EndpointModel> endpoints = ApplicationManager.getApplication().executeOnPooledThread(
+                () -> SpringEndpointScanner.getInstance().scanEndpoints(getProject())
+        ).get();
         EndpointModel endpoint = endpoints.stream()
                 .filter(candidate -> "/my-posts".equals(candidate.getPath()))
                 .findFirst()

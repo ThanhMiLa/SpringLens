@@ -1,8 +1,12 @@
 package vn.io.codelearning.springapitester.scanner;
 
-import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtilCore;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.java.stubs.index.JavaAnnotationIndex;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -10,6 +14,8 @@ import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.model.HttpMethodEnum;
 import vn.io.codelearning.springapitester.model.ParamTypeEnum;
 import vn.io.codelearning.springapitester.model.ParameterModel;
+import vn.io.codelearning.springapitester.model.PublicSecurityRule;
+import vn.io.codelearning.springapitester.model.ServerConfigMetadata;
 
 import java.util.*;
 
@@ -33,27 +39,29 @@ public class SpringEndpointScanner {
         if (project == null || project.isDisposed()) {
             return Collections.emptyList();
         }
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            throw new IllegalStateException("Spring endpoint scanning must run on a background thread");
+        }
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return doScan(project);
+        }
 
-        return DumbService.getInstance(project).runReadActionInSmartMode(new Computable<>() {
-            @Override
-            public List<EndpointModel> compute() {
-                return doScan(project);
-            }
-        });
+        return ReadAction.nonBlocking(() -> doScan(project))
+                .inSmartMode(project)
+                .expireWith(project)
+                .executeSynchronously();
     }
 
     private List<EndpointModel> doScan(Project project) {
         List<EndpointModel> result = new ArrayList<>();
         Set<PsiClass> controllerClasses = findControllerClasses(project);
-        List<vn.io.codelearning.springapitester.model.PublicSecurityRule> globalPublicRules = SecurityConfigScanner.scanForPublicRules(project);
+        List<PublicSecurityRule> globalPublicRules = SecurityConfigScanner.scanForPublicRules(project);
 
         SpringConfigResolutionService configService = SpringConfigResolutionService.getInstance(project);
-        if (configService != null) {
-            try {
-                configService.resolveServerConfig();
-                configService.resolveGatewayConfig();
-            } catch (Throwable ignored) {}
-        }
+        SpringServerConfig projectServerConfig = configService != null
+                ? configService.resolveServerConfig()
+                : new SpringServerConfig();
+        Map<Module, SpringServerConfig> moduleConfigs = new HashMap<>();
 
         for (PsiClass controllerClass : controllerClasses) {
             String packageName = extractPackageName(controllerClass);
@@ -63,35 +71,32 @@ public class SpringEndpointScanner {
             boolean classIsRest = SpringAnnotationUtils.isRestController(controllerClass);
 
             // Determine module and base URL
-            com.intellij.openapi.module.Module module = com.intellij.openapi.module.ModuleUtilCore.findModuleForPsiElement(controllerClass);
+            Module module = ModuleUtilCore.findModuleForPsiElement(controllerClass);
             String moduleName = "Unknown";
-            String directBaseUrl = "http://localhost:8080";
+            SpringServerConfig serverConfig = projectServerConfig;
             if (module != null) {
                 String rawName = module.getName();
                 moduleName = rawName.endsWith(".main") ? rawName.substring(0, rawName.length() - 5) : rawName;
                 
                 // Try to get folder name from content roots
-                com.intellij.openapi.vfs.VirtualFile[] contentRoots = com.intellij.openapi.roots.ModuleRootManager.getInstance(module).getContentRoots();
+                VirtualFile[] contentRoots = ModuleRootManager.getInstance(module).getContentRoots();
                 if (contentRoots.length > 0) {
                     moduleName = contentRoots[0].getName();
                 }
                 
                 if (configService != null) {
-                    SpringServerConfig serverConfig = configService.resolveServerConfig(module);
-                    directBaseUrl = serverConfig.getBaseUrl();
-                    if (serverConfig.getAppName() != null && !serverConfig.getAppName().isEmpty()) {
-                        moduleName = serverConfig.getAppName();
-                    }
-                }
-            } else {
-                if (configService != null) {
-                    SpringServerConfig serverConfig = configService.resolveServerConfig();
-                    directBaseUrl = serverConfig.getBaseUrl();
-                    if (serverConfig.getAppName() != null && !serverConfig.getAppName().isEmpty()) {
-                        moduleName = serverConfig.getAppName();
-                    }
+                    serverConfig = moduleConfigs.computeIfAbsent(module, configService::resolveServerConfig);
                 }
             }
+            String directBaseUrl = serverConfig.getBaseUrl();
+            if (serverConfig.getAppName() != null && !serverConfig.getAppName().isEmpty()) {
+                moduleName = serverConfig.getAppName();
+            }
+            ServerConfigMetadata serverConfigMetadata = new ServerConfigMetadata(
+                    serverConfig.getSourceFile(),
+                    serverConfig.isFallback(),
+                    serverConfig.hasUnresolvedPlaceholder()
+            );
 
             // Dùng getAllMethods() để bắt cả method từ Interface/Class cha, lọc trùng bằng signature
             Set<String> processedSignatures = new HashSet<>();
@@ -112,6 +117,7 @@ public class SpringEndpointScanner {
                 for (EndpointModel ep : methodEndpoints) {
                     ep.setModuleName(moduleName);
                     ep.setDirectBaseUrl(directBaseUrl);
+                    ep.setServerConfigMetadata(serverConfigMetadata);
                     ep.setMethodSignature(signature);
                     ep.setSourceFilePath(sourceFilePath);
                 }
@@ -194,7 +200,7 @@ public class SpringEndpointScanner {
     private List<EndpointModel> processMethod(PsiMethod method, PsiClass controllerClass,
                                                List<String> classPaths, String packageName,
                                                String controllerName, boolean classIsRest,
-                                               List<vn.io.codelearning.springapitester.model.PublicSecurityRule> globalPublicRules) {
+                                               List<PublicSecurityRule> globalPublicRules) {
         List<EndpointModel> endpoints = new ArrayList<>();
 
         for (PsiAnnotation anno : method.getAnnotations()) {
@@ -392,7 +398,7 @@ public class SpringEndpointScanner {
             return "";
         }
 
-        com.intellij.openapi.vfs.VirtualFile virtualFile = file.getVirtualFile();
+        VirtualFile virtualFile = file.getVirtualFile();
         return virtualFile != null ? virtualFile.getPath() : file.getName();
     }
 

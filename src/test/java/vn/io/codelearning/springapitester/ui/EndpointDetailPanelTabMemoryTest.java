@@ -7,7 +7,10 @@ import com.intellij.openapi.editor.Editor;
 import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.model.HttpMethodEnum;
 import vn.io.codelearning.springapitester.model.RequestTab;
+import vn.io.codelearning.springapitester.model.ServerConfigMetadata;
+import vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService;
 
+import javax.swing.JTextField;
 import java.lang.reflect.Field;
 
 public class EndpointDetailPanelTabMemoryTest extends BasePlatformTestCase {
@@ -37,6 +40,29 @@ public class EndpointDetailPanelTabMemoryTest extends BasePlatformTestCase {
 
                 panel.displayEndpoint(endpointB);
                 assertEquals(EndpointDetailPanel.requestTabIndex(RequestTab.BODY), requestTabs.getSelectedIndex());
+            } finally {
+                releaseEditor(panel, "requestBodyEditor");
+                releaseEditor(panel, "responseBodyEditor");
+            }
+        });
+    }
+
+    public void testDisplayScannedEndpointUsesPreparedConfigMetadataOnEdt() throws Exception {
+        SpringConfigResolutionService.getInstance(getProject()).invalidateCache();
+
+        EdtTestUtil.runInEdtAndWait(() -> {
+            EndpointDetailPanel panel = new EndpointDetailPanel(getProject());
+            try {
+                EndpointModel endpoint = new EndpointModel(
+                        HttpMethodEnum.GET, "/orders", "OrderController", "demo", "findOrders");
+                endpoint.setDirectBaseUrl("http://localhost:8081");
+                endpoint.setServerConfigMetadata(new ServerConfigMetadata(
+                        "/project/src/main/resources/application.yml", false, false));
+
+                panel.displayEndpoint(endpoint);
+
+                JTextField urlField = (JTextField) readField(panel, "urlField");
+                assertEquals("Resolved from: /project/src/main/resources/application.yml", urlField.getToolTipText());
             } finally {
                 releaseEditor(panel, "requestBodyEditor");
                 releaseEditor(panel, "responseBodyEditor");

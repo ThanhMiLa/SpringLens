@@ -1,14 +1,8 @@
 package vn.io.codelearning.springapitester.scanner;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.search.FilenameIndex;
-import com.intellij.psi.search.GlobalSearchScope;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.StringReader;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -16,26 +10,6 @@ import java.util.*;
  * Hỗ trợ cơ chế ưu tiên: base config → profile config (override) và indentation tracking cho YAML.
  */
 public final class SpringConfigReader {
-
-    // Base configs đọc trước (priority thấp)
-    private static final List<String> BASE_CONFIG_FILENAMES = List.of(
-            "application.properties",
-            "application.yml",
-            "application.yaml"
-    );
-
-    // Profile configs đọc sau (priority cao, ghi đè base)
-    private static final List<String> PROFILE_CONFIG_FILENAMES = List.of(
-            "application-dev.properties",
-            "application-dev.yml",
-            "application-dev.yaml",
-            "application-local.properties",
-            "application-local.yml",
-            "application-local.yaml",
-            "application-staging.properties",
-            "application-staging.yml",
-            "application-staging.yaml"
-    );
 
     private SpringConfigReader() {}
 
@@ -48,69 +22,7 @@ public final class SpringConfigReader {
             return new SpringServerConfig();
         }
         SpringConfigResolutionService service = SpringConfigResolutionService.getInstance(project);
-        if (service != null) {
-            return service.resolveServerConfig();
-        }
-        SpringServerConfig config = new SpringServerConfig();
-        try {
-            if (com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed()) {
-                doReadServerConfig(project, config);
-            } else {
-                com.intellij.openapi.application.ApplicationManager.getApplication().runReadAction(
-                    () -> doReadServerConfig(project, config)
-                );
-            }
-        } catch (Throwable t) {
-            // ignore
-        }
-        return config;
-    }
-
-    private static void doReadServerConfig(Project project, SpringServerConfig config) {
-        try {
-            GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
-
-            // Bước 1: Đọc base config trước
-            for (String filename : BASE_CONFIG_FILENAMES) {
-                parseConfigFile(filename, scope, config);
-            }
-
-            // Bước 2: Đọc profile config sau (ghi đè lên base nếu có giá trị)
-            for (String filename : PROFILE_CONFIG_FILENAMES) {
-                parseConfigFile(filename, scope, config);
-            }
-        } catch (Throwable t) {
-            // ignore
-        }
-    }
-
-    private static void parseConfigFile(String filename, GlobalSearchScope scope, SpringServerConfig config) {
-        Collection<VirtualFile> files = FilenameIndex.getVirtualFilesByName(filename, scope);
-        for (VirtualFile file : files) {
-            if (file.isValid() && !file.isDirectory()) {
-                String content = readFileContent(file);
-                if (content != null && !content.isBlank()) {
-                    if (filename.endsWith(".properties")) {
-                        parsePropertiesContent(content, config);
-                    } else {
-                        parseYamlContent(content, config);
-                    }
-                }
-            }
-        }
-    }
-
-    private static String readFileContent(VirtualFile file) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            return null;
-        }
+        return service != null ? service.resolveServerConfig() : new SpringServerConfig();
     }
 
     /**

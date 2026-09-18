@@ -1,5 +1,9 @@
 package vn.io.codelearning.springapitester.ui;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
@@ -8,12 +12,16 @@ import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import org.jetbrains.annotations.NotNull;
 import vn.io.codelearning.springapitester.model.EndpointModel;
+import vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService;
 import vn.io.codelearning.springapitester.scanner.SpringEndpointScanner;
-import vn.io.codelearning.springapitester.client.HttpClientService;
+import vn.io.codelearning.springapitester.scanner.SpringServerConfig;
+import vn.io.codelearning.springapitester.state.EndpointSavedState;
+import vn.io.codelearning.springapitester.state.SpringLensState;
+import vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig;
 
-import javax.swing.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class SpringLensToolWindowFactory implements ToolWindowFactory {
 
@@ -31,48 +39,53 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
         
         // Need an array trick to let the lambda reference the treePanel
         final EndpointTreePanel[] treePanelHolder = new EndpointTreePanel[1];
+        AtomicLong reloadGeneration = new AtomicLong();
 
         Runnable reloadTask = () -> {
-            com.intellij.openapi.progress.ProgressManager.getInstance().run(
-                new com.intellij.openapi.progress.Task.Backgroundable(project, "Scanning Spring Endpoints...", true) {
-                    @Override
-                    public void run(@NotNull com.intellij.openapi.progress.ProgressIndicator indicator) {
-                        vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService configService =
-                                vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService.getInstance(project);
-                        if (configService != null) {
-                            configService.invalidateCache();
-                        }
-                        List<EndpointModel> scannedEndpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
-                        vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig gatewayConfig = 
-                                vn.io.codelearning.springapitester.util.GatewayConfigReader.findGatewayConfig(project);
-                        final String defaultBaseUrl = configService != null
-                                ? configService.resolveServerConfig().getBaseUrl()
-                                : vn.io.codelearning.springapitester.util.SpringBootConfigReader.extractBaseUrl(project);
-
-                        // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
-                        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
-                        if (state != null && !scannedEndpoints.isEmpty()) {
-                            state.migrateLegacyKeys(scannedEndpoints);
-                            state.pruneOrphanScannedEndpoints(scannedEndpoints);
-                            for (EndpointModel ep : scannedEndpoints) {
-                                state.restoreEndpoint(ep);
-                            }
-                        }
-                        
-                        // Update Tree and DetailPanel on EDT
-                        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
-                            if (project.isDisposed()) return;
-                            detailPanel.setGatewayConfig(gatewayConfig);
-                            detailPanel.setDefaultBaseUrl(defaultBaseUrl);
-                            endpoints = scannedEndpoints;
-                            if (treePanelHolder[0] != null) {
-                                treePanelHolder[0].updateEndpoints(endpoints);
-                            }
-                            detailPanel.refreshEndpoint();
-                        });
+            long generation = reloadGeneration.incrementAndGet();
+            new Task.Backgroundable(project, "Scanning Spring Endpoints...", true) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    SpringConfigResolutionService configService = SpringConfigResolutionService.getInstance(project);
+                    if (configService != null) {
+                        configService.invalidateCache();
                     }
+                    List<EndpointModel> scannedEndpoints = SpringEndpointScanner.getInstance().scanEndpoints(project);
+                    indicator.checkCanceled();
+                    if (generation != reloadGeneration.get()) return;
+
+                    GatewayConfig gatewayConfig = configService != null
+                            ? configService.resolveGatewayConfig()
+                            : new GatewayConfig();
+                    SpringServerConfig defaultServerConfig = configService != null
+                            ? configService.resolveServerConfig()
+                            : new SpringServerConfig();
+                    indicator.checkCanceled();
+                    if (generation != reloadGeneration.get()) return;
+
+                    // Khôi phục trạng thái (Token, Body, Params) đã nhập trước đó
+                    SpringLensState state = SpringLensState.getInstance(project);
+                    if (state != null && !scannedEndpoints.isEmpty()) {
+                        state.migrateLegacyKeys(scannedEndpoints);
+                        state.pruneOrphanScannedEndpoints(scannedEndpoints);
+                        for (EndpointModel endpoint : scannedEndpoints) {
+                            state.restoreEndpoint(endpoint);
+                        }
+                    }
+
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (project.isDisposed() || generation != reloadGeneration.get()) return;
+                        detailPanel.setGatewayConfig(gatewayConfig);
+                        detailPanel.setDefaultBaseUrl(defaultServerConfig.getBaseUrl());
+                        endpoints = scannedEndpoints;
+                        if (treePanelHolder[0] != null) {
+                            treePanelHolder[0].setGatewayAvailable(gatewayConfig.gatewayDetected);
+                            treePanelHolder[0].updateEndpoints(endpoints);
+                        }
+                        detailPanel.refreshEndpoint();
+                    });
                 }
-            );
+            }.queue();
         };
 
         treePanelHolder[0] = new EndpointTreePanel(project, 
@@ -88,7 +101,7 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
         });
 
         detailPanel.setOnApplyToAllAuth(authConfig -> {
-            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+            SpringLensState state = SpringLensState.getInstance(project);
             if (state != null) {
                 // Apply to currently scanned endpoints in memory
                 if (endpoints != null) {
@@ -98,10 +111,10 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                     }
                 }
                 // Apply to all stored endpoints in state
-                for (vn.io.codelearning.springapitester.state.EndpointSavedState storedEp : state.endpoints.values()) {
+                for (EndpointSavedState storedEp : state.endpoints.values()) {
                     state.updateSavedAuthConfig(storedEp, authConfig);
                 }
-                for (vn.io.codelearning.springapitester.state.EndpointSavedState storedManualEp : state.manualEndpoints) {
+                for (EndpointSavedState storedManualEp : state.manualEndpoints) {
                     state.updateSavedAuthConfig(storedManualEp, authConfig);
                 }
             }
@@ -122,6 +135,6 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
         toolWindow.getContentManager().addContent(content);
 
         // Auto-scan when project is smart (indexes ready)
-        com.intellij.openapi.project.DumbService.getInstance(project).runWhenSmart(reloadTask);
+        DumbService.getInstance(project).runWhenSmart(reloadTask);
     }
 }

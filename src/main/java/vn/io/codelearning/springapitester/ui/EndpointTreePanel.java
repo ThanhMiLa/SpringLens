@@ -25,12 +25,13 @@ public class EndpointTreePanel extends JPanel {
     private final JButton reloadBtn;
     private final com.intellij.openapi.ui.ComboBox<SourceFileFilterOption> sourceFileComboBox;
 
-    private List<EndpointModel> currentEndpoints;
+    private List<EndpointModel> currentEndpoints = Collections.emptyList();
     private final Consumer<EndpointModel> onEndpointSelected;
     private Runnable onReloadClicked;
     private Runnable onModeChanged;
     private com.intellij.openapi.ui.ComboBox<String> gatewayComboBox;
     private boolean updatingSourceFileFilter;
+    private boolean gatewayAvailable;
 
     public EndpointTreePanel(Project project, Consumer<EndpointModel> onEndpointSelected, Runnable onReloadClicked) {
         this.project = project;
@@ -253,6 +254,11 @@ public class EndpointTreePanel extends JPanel {
         this.onModeChanged = onModeChanged;
     }
 
+    public void setGatewayAvailable(boolean gatewayAvailable) {
+        this.gatewayAvailable = gatewayAvailable;
+        gatewayComboBox.setVisible(gatewayAvailable && !currentEndpoints.isEmpty());
+    }
+
     public void updateEndpoints(List<EndpointModel> endpoints) {
         this.currentEndpoints = endpoints != null ? endpoints : Collections.emptyList();
         updateSourceFileFilterOptions(this.currentEndpoints);
@@ -289,26 +295,12 @@ public class EndpointTreePanel extends JPanel {
             }
         }
 
+        gatewayComboBox.setVisible(gatewayAvailable && !filteredEndpoints.isEmpty());
+
         // 2. Build Scanned Controllers
         if (!filteredEndpoints.isEmpty()) {
-            boolean hasGateway = false;
-            try {
-                com.intellij.openapi.module.Module[] modules = com.intellij.openapi.module.ModuleManager.getInstance(project).getModules();
-                for (com.intellij.openapi.module.Module m : modules) {
-                    if (m != null && !m.isDisposed() && vn.io.codelearning.springapitester.util.GatewayConfigReader.hasGatewayDependency(m)) {
-                        hasGateway = true; break;
-                    }
-                }
-            } catch (Throwable t) {
-                // ignore
-            }
-            
-            if (gatewayComboBox != null) {
-                gatewayComboBox.setVisible(hasGateway);
-            }
-            
             java.util.Set<String> moduleNames = filteredEndpoints.stream().map(e -> e.getModuleName() != null ? e.getModuleName() : "Unknown").collect(Collectors.toSet());
-            boolean useModuleLevel = moduleNames.size() > 1 || hasGateway;
+            boolean useModuleLevel = moduleNames.size() > 1 || gatewayAvailable;
 
             if (useModuleLevel) {
                 Map<String, List<EndpointModel>> moduleGrouped = filteredEndpoints.stream()

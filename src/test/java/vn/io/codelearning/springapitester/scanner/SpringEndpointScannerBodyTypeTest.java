@@ -1,5 +1,6 @@
 package vn.io.codelearning.springapitester.scanner;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import vn.io.codelearning.springapitester.model.EndpointModel;
 import vn.io.codelearning.springapitester.model.RequestBodyType;
@@ -8,7 +9,7 @@ import java.util.List;
 
 public class SpringEndpointScannerBodyTypeTest extends BasePlatformTestCase {
 
-    public void testScannerDeterminesBodyTypeFromControllerSignature() {
+    public void testScannerDeterminesBodyTypeFromControllerSignature() throws Exception {
         addSpringWebAnnotations();
         myFixture.addFileToProject("org/springframework/web/multipart/MultipartFile.java", """
                 package org.springframework.web.multipart;
@@ -42,7 +43,9 @@ public class SpringEndpointScannerBodyTypeTest extends BasePlatformTestCase {
                 class FormData { String name; }
                 """);
 
-        List<EndpointModel> endpoints = SpringEndpointScanner.getInstance().scanEndpoints(getProject());
+        List<EndpointModel> endpoints = ApplicationManager.getApplication().executeOnPooledThread(
+                () -> SpringEndpointScanner.getInstance().scanEndpoints(getProject())
+        ).get();
 
         assertBodyType(endpoints, "/json", RequestBodyType.JSON);
         assertBodyType(endpoints, "/form", RequestBodyType.FORM_DATA);
