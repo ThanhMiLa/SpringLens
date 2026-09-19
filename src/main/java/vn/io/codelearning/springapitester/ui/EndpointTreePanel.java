@@ -20,6 +20,9 @@ import java.util.stream.Collectors;
 
 public class EndpointTreePanel extends JPanel {
 
+    private static final String DIRECT_SERVICES_OPTION = "🎯 Direct Services";
+    private static final String API_GATEWAY_OPTION = "🌐 API Gateway";
+
     private final Project project;
     private final Tree tree;
     private final DefaultTreeModel treeModel;
@@ -33,6 +36,7 @@ public class EndpointTreePanel extends JPanel {
     private Runnable onModeChanged;
     private com.intellij.openapi.ui.ComboBox<String> gatewayComboBox;
     private boolean updatingSourceFileFilter;
+    private boolean updatingGatewayOptions;
     private GatewayConfig gatewayConfig = new GatewayConfig();
     private EndpointModel selectedEndpoint;
 
@@ -101,7 +105,7 @@ public class EndpointTreePanel extends JPanel {
                 updateEndpoints(currentEndpoints);
             }
         });
-        gatewayComboBox = new com.intellij.openapi.ui.ComboBox<>(new String[]{"🎯 Direct Services", "🌐 API Gateway"});
+        gatewayComboBox = new com.intellij.openapi.ui.ComboBox<>(new String[]{DIRECT_SERVICES_OPTION, API_GATEWAY_OPTION});
         gatewayComboBox.setVisible(false);
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
         if (state != null) {
@@ -109,6 +113,9 @@ public class EndpointTreePanel extends JPanel {
         }
         
         gatewayComboBox.addActionListener(e -> {
+            if (updatingGatewayOptions) {
+                return;
+            }
             if (state != null) {
                 state.gatewayModeEnabled = (gatewayComboBox.getSelectedIndex() == 1);
             }
@@ -357,11 +364,30 @@ public class EndpointTreePanel extends JPanel {
     }
 
     static boolean shouldShowGatewaySelector(EndpointModel endpoint, GatewayConfig gatewayConfig) {
+        return endpoint != null && GatewayEndpointResolver.hasGatewayConfiguration(gatewayConfig);
+    }
+
+    static boolean isGatewayOptionAvailable(EndpointModel endpoint, GatewayConfig gatewayConfig) {
         return endpoint != null && GatewayEndpointResolver.resolve(endpoint, gatewayConfig).isRoutable();
     }
 
     private void updateGatewaySelectorVisibility() {
-        gatewayComboBox.setVisible(shouldShowGatewaySelector(selectedEndpoint, gatewayConfig));
+        boolean showGatewayOption = isGatewayOptionAvailable(selectedEndpoint, gatewayConfig);
+        updatingGatewayOptions = true;
+        try {
+            gatewayComboBox.setModel(new DefaultComboBoxModel<>(showGatewayOption
+                    ? new String[]{DIRECT_SERVICES_OPTION, API_GATEWAY_OPTION}
+                    : new String[]{DIRECT_SERVICES_OPTION}));
+
+            vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+            gatewayComboBox.setSelectedIndex(showGatewayOption && state != null && state.gatewayModeEnabled ? 1 : 0);
+            gatewayComboBox.setToolTipText(showGatewayOption
+                    ? null
+                    : "Internal API: requests are sent directly to its service.");
+            gatewayComboBox.setVisible(shouldShowGatewaySelector(selectedEndpoint, gatewayConfig));
+        } finally {
+            updatingGatewayOptions = false;
+        }
     }
 
     static List<EndpointModel> filterEndpointsBySourceFile(List<EndpointModel> endpoints, String sourceFilePath) {

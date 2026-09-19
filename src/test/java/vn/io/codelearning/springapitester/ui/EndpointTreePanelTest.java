@@ -53,25 +53,29 @@ public class EndpointTreePanelTest {
     }
 
     @Test
-    public void testGatewaySelectorIsShownOnlyForExposedEndpoint() {
+    public void testGatewaySelectorStaysVisibleForInternalEndpoint() {
         GatewayConfigReader.GatewayConfig gatewayConfig = gatewayConfig();
         EndpointModel publicEndpoint = gatewayEndpoint("/profile/users/{id}");
         EndpointModel internalEndpoint = gatewayEndpoint("/profile/internal/sync");
 
         Assert.assertTrue(EndpointTreePanel.shouldShowGatewaySelector(publicEndpoint, gatewayConfig));
-        Assert.assertFalse(EndpointTreePanel.shouldShowGatewaySelector(internalEndpoint, gatewayConfig));
+        Assert.assertTrue(EndpointTreePanel.shouldShowGatewaySelector(internalEndpoint, gatewayConfig));
+        Assert.assertTrue(EndpointTreePanel.isGatewayOptionAvailable(publicEndpoint, gatewayConfig));
+        Assert.assertFalse(EndpointTreePanel.isGatewayOptionAvailable(internalEndpoint, gatewayConfig));
     }
 
     @Test
-    public void testGatewaySelectorIsHiddenForManualAndAbsoluteEndpoints() {
+    public void testGatewayOptionIsUnavailableForManualAndAbsoluteEndpoints() {
         GatewayConfigReader.GatewayConfig gatewayConfig = gatewayConfig();
         EndpointModel manualEndpoint = gatewayEndpoint("/profile/users/1");
         manualEndpoint.setManual(true);
         EndpointModel absoluteEndpoint = gatewayEndpoint("https://example.com/profile/users/1");
         absoluteEndpoint.setAbsoluteUrl(true);
 
-        Assert.assertFalse(EndpointTreePanel.shouldShowGatewaySelector(manualEndpoint, gatewayConfig));
-        Assert.assertFalse(EndpointTreePanel.shouldShowGatewaySelector(absoluteEndpoint, gatewayConfig));
+        Assert.assertTrue(EndpointTreePanel.shouldShowGatewaySelector(manualEndpoint, gatewayConfig));
+        Assert.assertTrue(EndpointTreePanel.shouldShowGatewaySelector(absoluteEndpoint, gatewayConfig));
+        Assert.assertFalse(EndpointTreePanel.isGatewayOptionAvailable(manualEndpoint, gatewayConfig));
+        Assert.assertFalse(EndpointTreePanel.isGatewayOptionAvailable(absoluteEndpoint, gatewayConfig));
         Assert.assertFalse(EndpointTreePanel.shouldShowGatewaySelector(null, gatewayConfig));
     }
 

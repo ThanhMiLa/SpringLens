@@ -16,7 +16,7 @@ import java.util.List;
 
 public class EndpointTreePanelGatewayVisibilityTest extends BasePlatformTestCase {
 
-    public void testSelectionShowsGatewaySelectorOnlyForExposedEndpoint() throws Exception {
+    public void testSelectionKeepsGatewaySelectorForInternalEndpointWithDirectOnlyOption() throws Exception {
         EdtTestUtil.runInEdtAndWait(() -> {
             EndpointModel publicEndpoint = endpoint("/profile/users/1");
             EndpointModel internalEndpoint = endpoint("/profile/internal/sync");
@@ -29,9 +29,12 @@ public class EndpointTreePanelGatewayVisibilityTest extends BasePlatformTestCase
 
             tree.setSelectionPath(pathForEndpoint(tree, publicEndpoint));
             assertTrue(gatewayComboBox.isVisible());
+            assertEquals(2, gatewayComboBox.getItemCount());
 
             tree.setSelectionPath(pathForEndpoint(tree, internalEndpoint));
-            assertFalse(gatewayComboBox.isVisible());
+            assertTrue(gatewayComboBox.isVisible());
+            assertEquals(1, gatewayComboBox.getItemCount());
+            assertEquals("🎯 Direct Services", gatewayComboBox.getSelectedItem());
         });
     }
 

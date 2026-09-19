@@ -31,11 +31,7 @@ public final class GatewayEndpointResolver {
         String directBaseUrl = endpoint.getDirectBaseUrl() != null ? endpoint.getDirectBaseUrl().trim() : "";
         String directPath = endpoint.getPath() != null ? endpoint.getPath().trim() : "";
 
-        boolean hasGateway = gatewayConfig != null && (gatewayConfig.gatewayDetected
-                || gatewayConfig.discoveryLocatorEnabled
-                || (gatewayConfig.routes != null && !gatewayConfig.routes.isEmpty()));
-
-        if (endpoint.isManual() || endpoint.isAbsoluteUrl() || !hasGateway) {
+        if (endpoint.isManual() || endpoint.isAbsoluteUrl() || !hasGatewayConfiguration(gatewayConfig)) {
             return GatewayEndpointResolution.notRoutable(directBaseUrl, directPath);
         }
 
@@ -132,6 +128,12 @@ public final class GatewayEndpointResolver {
         }
 
         return GatewayEndpointResolution.notRoutable(directBaseUrl, directPath);
+    }
+
+    public static boolean hasGatewayConfiguration(GatewayConfigReader.GatewayConfig gatewayConfig) {
+        return gatewayConfig != null && (gatewayConfig.gatewayDetected
+                || gatewayConfig.discoveryLocatorEnabled
+                || (gatewayConfig.routes != null && !gatewayConfig.routes.isEmpty()));
     }
 
     public static boolean isRouteTargetingService(GatewayRouteModel route, EndpointModel endpoint) {
