@@ -110,7 +110,7 @@ public class GatewayUrlCalculatorTest {
         GatewayRouteModel route = new GatewayRouteModel();
         route.setId("inventory-service");
         route.setUri("http://localhost:8083");
-        route.getPathPredicates().add("/api/v1/inventory/**");
+        route.getPathPredicates().add("/api/inventory/**");
         route.setStripPrefix(1); // Strips /api
         config.routes.add(route);
 
@@ -168,17 +168,19 @@ public class GatewayUrlCalculatorTest {
     }
 
     @Test
-    public void testFallbackWhenNoRouteMatches() {
+    public void testWhenNoRouteMatchesReturnsDirectUrl() {
         GatewayConfigReader.GatewayConfig config = new GatewayConfigReader.GatewayConfig();
         config.port = "8888";
+        config.gatewayDetected = true;
 
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/unknown/path", "UnknownController", "com.example", "test");
         endpoint.setModuleName("my-service");
         endpoint.setDirectBaseUrl("http://localhost:9999");
 
         String[] parts = GatewayUrlCalculator.calculateFull(endpoint, config);
-        Assert.assertEquals("http://localhost:8888/my-service", parts[0]);
+        Assert.assertEquals("http://localhost:9999", parts[0]);
         Assert.assertEquals("/unknown/path", parts[1]);
+        Assert.assertEquals("http://localhost:9999/unknown/path", GatewayUrlCalculator.calculate(endpoint, config));
     }
 
     @Test

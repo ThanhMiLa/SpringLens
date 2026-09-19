@@ -16,9 +16,12 @@ import vn.io.codelearning.springapitester.client.QueryParameterUrlBuilder;
 import vn.io.codelearning.springapitester.generator.DtoJsonGenerator;
 import vn.io.codelearning.springapitester.model.EndpointIdentity;
 import vn.io.codelearning.springapitester.model.EndpointModel;
+import vn.io.codelearning.springapitester.model.GatewayEndpointResolution;
 import vn.io.codelearning.springapitester.model.ParameterModel;
 import vn.io.codelearning.springapitester.model.ParamTypeEnum;
 import vn.io.codelearning.springapitester.model.ServerConfigMetadata;
+import vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig;
+import vn.io.codelearning.springapitester.util.GatewayEndpointResolver;
 
 import javax.swing.*;
 import java.awt.*;
@@ -60,7 +63,7 @@ public class EndpointDetailPanel extends JPanel {
 
     // Default local base URL for testing
     private String baseUrl = "http://localhost:8080";
-    private vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig cachedGatewayConfig;
+    private GatewayConfig cachedGatewayConfig;
     
     private Runnable onEndpointUpdated;
     private java.util.function.Consumer<vn.io.codelearning.springapitester.model.AuthConfig> onApplyToAllAuth;
@@ -82,11 +85,11 @@ public class EndpointDetailPanel extends JPanel {
         this.onApplyToAllAuth = onApplyToAllAuth;
     }
 
-    public void setGatewayConfig(vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig gatewayConfig) {
+    public void setGatewayConfig(GatewayConfig gatewayConfig) {
         this.cachedGatewayConfig = gatewayConfig;
     }
 
-    public vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig getGatewayConfig() {
+    public GatewayConfig getGatewayConfig() {
         return this.cachedGatewayConfig;
     }
 
@@ -672,9 +675,7 @@ public class EndpointDetailPanel extends JPanel {
             methodComboBox.setSelectedItem(method);
             updateMethodComboColor(method);
 
-            String effectiveBaseUrl = getEffectiveBaseUrl(endpoint);
-            String fullUrl = vn.io.codelearning.springapitester.util.UrlResolutionUtil.resolveFullUrl(
-                    effectiveBaseUrl, endpoint.getPath(), endpoint.isAbsoluteUrl());
+            String fullUrl = getEffectiveUrl(endpoint);
             urlField.setText(QueryParameterUrlBuilder.applyQueryParameters(fullUrl, endpoint.getParameters()));
 
             urlField.setToolTipText(serverConfigTooltip(endpoint));
@@ -1159,17 +1160,34 @@ public class EndpointDetailPanel extends JPanel {
         if (endpoint.isAbsoluteUrl()) {
             return "";
         }
-        
+
         vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
-        if (state != null && state.gatewayModeEnabled && cachedGatewayConfig != null) {
-            String[] parts = vn.io.codelearning.springapitester.util.GatewayUrlCalculator.calculateFull(endpoint, cachedGatewayConfig);
-            if (parts != null && parts.length > 0 && parts[0] != null && !parts[0].isBlank()) {
-                return parts[0];
+        if (state != null && state.gatewayModeEnabled) {
+            GatewayEndpointResolution resolution = GatewayEndpointResolver.resolve(endpoint, cachedGatewayConfig);
+            if (resolution.isRoutable()) {
+                return resolution.getGatewayBaseUrl();
             }
         }
-        return endpoint.getDirectBaseUrl() != null && !endpoint.getDirectBaseUrl().isBlank() 
-                ? endpoint.getDirectBaseUrl() 
+        return endpoint.getDirectBaseUrl() != null && !endpoint.getDirectBaseUrl().isBlank()
+                ? endpoint.getDirectBaseUrl()
                 : (baseUrl != null ? baseUrl : "http://localhost:8080");
+    }
+
+    private String getEffectiveUrl(EndpointModel endpoint) {
+        if (endpoint == null) {
+            return getEffectiveBaseUrl(null);
+        }
+
+        vn.io.codelearning.springapitester.state.SpringLensState state = vn.io.codelearning.springapitester.state.SpringLensState.getInstance(project);
+        if (state != null && state.gatewayModeEnabled) {
+            GatewayEndpointResolution resolution = GatewayEndpointResolver.resolve(endpoint, cachedGatewayConfig);
+            if (resolution.isRoutable()) {
+                return resolution.getFullGatewayUrl();
+            }
+        }
+
+        return vn.io.codelearning.springapitester.util.UrlResolutionUtil.resolveFullUrl(
+                getEffectiveBaseUrl(endpoint), endpoint.getPath(), endpoint.isAbsoluteUrl());
     }
 
     private void updateMethodComboColor(vn.io.codelearning.springapitester.model.HttpMethodEnum method) {

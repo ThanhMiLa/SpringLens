@@ -79,7 +79,7 @@ public class SpringLensToolWindowFactory implements ToolWindowFactory {
                         detailPanel.setDefaultBaseUrl(defaultServerConfig.getBaseUrl());
                         endpoints = scannedEndpoints;
                         if (treePanelHolder[0] != null) {
-                            treePanelHolder[0].setGatewayAvailable(gatewayConfig.gatewayDetected);
+                            treePanelHolder[0].setGatewayConfig(gatewayConfig);
                             treePanelHolder[0].updateEndpoints(endpoints);
                         }
                         detailPanel.refreshEndpoint();

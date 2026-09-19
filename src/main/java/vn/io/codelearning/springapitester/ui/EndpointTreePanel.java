@@ -4,6 +4,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import vn.io.codelearning.springapitester.model.EndpointModel;
+import vn.io.codelearning.springapitester.util.GatewayConfigReader.GatewayConfig;
+import vn.io.codelearning.springapitester.util.GatewayEndpointResolver;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -31,7 +33,8 @@ public class EndpointTreePanel extends JPanel {
     private Runnable onModeChanged;
     private com.intellij.openapi.ui.ComboBox<String> gatewayComboBox;
     private boolean updatingSourceFileFilter;
-    private boolean gatewayAvailable;
+    private GatewayConfig gatewayConfig = new GatewayConfig();
+    private EndpointModel selectedEndpoint;
 
     public EndpointTreePanel(Project project, Consumer<EndpointModel> onEndpointSelected, Runnable onReloadClicked) {
         this.project = project;
@@ -135,9 +138,14 @@ public class EndpointTreePanel extends JPanel {
             DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
             if (selectedNode != null && selectedNode.getUserObject() instanceof EndpointModel) {
                 EndpointModel endpoint = (EndpointModel) selectedNode.getUserObject();
+                selectedEndpoint = endpoint;
+                updateGatewaySelectorVisibility();
                 if (this.onEndpointSelected != null) {
                     this.onEndpointSelected.accept(endpoint);
                 }
+            } else {
+                selectedEndpoint = null;
+                updateGatewaySelectorVisibility();
             }
         });
         
@@ -254,13 +262,15 @@ public class EndpointTreePanel extends JPanel {
         this.onModeChanged = onModeChanged;
     }
 
-    public void setGatewayAvailable(boolean gatewayAvailable) {
-        this.gatewayAvailable = gatewayAvailable;
-        gatewayComboBox.setVisible(gatewayAvailable && !currentEndpoints.isEmpty());
+    public void setGatewayConfig(GatewayConfig gatewayConfig) {
+        this.gatewayConfig = gatewayConfig != null ? gatewayConfig : new GatewayConfig();
+        updateGatewaySelectorVisibility();
     }
 
     public void updateEndpoints(List<EndpointModel> endpoints) {
         this.currentEndpoints = endpoints != null ? endpoints : Collections.emptyList();
+        selectedEndpoint = null;
+        updateGatewaySelectorVisibility();
         updateSourceFileFilterOptions(this.currentEndpoints);
         List<EndpointModel> filteredEndpoints = filterEndpointsBySourceFile(this.currentEndpoints, getSelectedSourceFilePath());
         rootNode.removeAllChildren();
@@ -295,12 +305,10 @@ public class EndpointTreePanel extends JPanel {
             }
         }
 
-        gatewayComboBox.setVisible(gatewayAvailable && !filteredEndpoints.isEmpty());
-
         // 2. Build Scanned Controllers
         if (!filteredEndpoints.isEmpty()) {
             java.util.Set<String> moduleNames = filteredEndpoints.stream().map(e -> e.getModuleName() != null ? e.getModuleName() : "Unknown").collect(Collectors.toSet());
-            boolean useModuleLevel = moduleNames.size() > 1 || gatewayAvailable;
+            boolean useModuleLevel = moduleNames.size() > 1 || gatewayConfig.gatewayDetected;
 
             if (useModuleLevel) {
                 Map<String, List<EndpointModel>> moduleGrouped = filteredEndpoints.stream()
@@ -346,6 +354,14 @@ public class EndpointTreePanel extends JPanel {
         for (int i = 0; i < tree.getRowCount(); i++) {
             tree.expandRow(i);
         }
+    }
+
+    static boolean shouldShowGatewaySelector(EndpointModel endpoint, GatewayConfig gatewayConfig) {
+        return endpoint != null && GatewayEndpointResolver.resolve(endpoint, gatewayConfig).isRoutable();
+    }
+
+    private void updateGatewaySelectorVisibility() {
+        gatewayComboBox.setVisible(shouldShowGatewaySelector(selectedEndpoint, gatewayConfig));
     }
 
     static List<EndpointModel> filterEndpointsBySourceFile(List<EndpointModel> endpoints, String sourceFilePath) {

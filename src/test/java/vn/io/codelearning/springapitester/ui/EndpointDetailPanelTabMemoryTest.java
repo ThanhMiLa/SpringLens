@@ -5,10 +5,13 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.openapi.editor.Editor;
 import vn.io.codelearning.springapitester.model.EndpointModel;
+import vn.io.codelearning.springapitester.model.GatewayRouteModel;
 import vn.io.codelearning.springapitester.model.HttpMethodEnum;
 import vn.io.codelearning.springapitester.model.RequestTab;
 import vn.io.codelearning.springapitester.model.ServerConfigMetadata;
 import vn.io.codelearning.springapitester.scanner.SpringConfigResolutionService;
+import vn.io.codelearning.springapitester.state.SpringLensState;
+import vn.io.codelearning.springapitester.util.GatewayConfigReader;
 
 import javax.swing.JTextField;
 import java.lang.reflect.Field;
@@ -70,11 +73,87 @@ public class EndpointDetailPanelTabMemoryTest extends BasePlatformTestCase {
         });
     }
 
+    public void testGatewayModeFallsBackToDirectUrlForInternalEndpoint() throws Exception {
+        EdtTestUtil.runInEdtAndWait(() -> {
+            EndpointDetailPanel panel = new EndpointDetailPanel(getProject());
+            SpringLensState state = SpringLensState.getInstance(getProject());
+            boolean originalGatewayMode = state.gatewayModeEnabled;
+            try {
+                state.gatewayModeEnabled = true;
+                panel.setGatewayConfig(profileGatewayConfig());
+
+                EndpointModel publicEndpoint = scannedEndpoint("/profile/users/1");
+                EndpointModel internalEndpoint = scannedEndpoint("/profile/internal/sync");
+                JTextField urlField = (JTextField) readField(panel, "urlField");
+
+                panel.displayEndpoint(publicEndpoint);
+                assertEquals("http://localhost:8888/profile/users/1", urlField.getText());
+
+                panel.displayEndpoint(internalEndpoint);
+                assertEquals("http://localhost:8081/profile/internal/sync", urlField.getText());
+                assertTrue(state.gatewayModeEnabled);
+            } finally {
+                state.gatewayModeEnabled = originalGatewayMode;
+                releaseEditor(panel, "requestBodyEditor");
+                releaseEditor(panel, "responseBodyEditor");
+            }
+        });
+    }
+
+    public void testGatewayModeUsesResolvedPrefixPathUrl() throws Exception {
+        EdtTestUtil.runInEdtAndWait(() -> {
+            EndpointDetailPanel panel = new EndpointDetailPanel(getProject());
+            SpringLensState state = SpringLensState.getInstance(getProject());
+            boolean originalGatewayMode = state.gatewayModeEnabled;
+            try {
+                state.gatewayModeEnabled = true;
+                GatewayConfigReader.GatewayConfig gatewayConfig = new GatewayConfigReader.GatewayConfig();
+                gatewayConfig.gatewayDetected = true;
+                gatewayConfig.port = "8888";
+                GatewayRouteModel route = new GatewayRouteModel();
+                route.setId("profile-service");
+                route.setUri("http://localhost:8081");
+                route.getPathPredicates().add("/profile/users/**");
+                route.setPrefixPath("/v2");
+                gatewayConfig.routes.add(route);
+                panel.setGatewayConfig(gatewayConfig);
+
+                panel.displayEndpoint(scannedEndpoint("/v2/profile/users/1"));
+
+                JTextField urlField = (JTextField) readField(panel, "urlField");
+                assertEquals("http://localhost:8888/profile/users/1", urlField.getText());
+            } finally {
+                state.gatewayModeEnabled = originalGatewayMode;
+                releaseEditor(panel, "requestBodyEditor");
+                releaseEditor(panel, "responseBodyEditor");
+            }
+        });
+    }
+
     private EndpointModel manualEndpoint(String id) {
         EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, "/" + id, "", "", id);
         endpoint.setManual(true);
         endpoint.setId("request-tab-" + id);
         return endpoint;
+    }
+
+    private EndpointModel scannedEndpoint(String path) {
+        EndpointModel endpoint = new EndpointModel(HttpMethodEnum.GET, path, "ProfileController", "demo", "getProfile");
+        endpoint.setModuleName("profile-service");
+        endpoint.setDirectBaseUrl("http://localhost:8081");
+        return endpoint;
+    }
+
+    private GatewayConfigReader.GatewayConfig profileGatewayConfig() {
+        GatewayConfigReader.GatewayConfig gatewayConfig = new GatewayConfigReader.GatewayConfig();
+        gatewayConfig.gatewayDetected = true;
+        gatewayConfig.port = "8888";
+        GatewayRouteModel route = new GatewayRouteModel();
+        route.setId("profile-service");
+        route.setUri("http://localhost:8081");
+        route.getPathPredicates().add("/profile/users/**");
+        gatewayConfig.routes.add(route);
+        return gatewayConfig;
     }
 
     private JBTabbedPane requestTabs(EndpointDetailPanel panel) {
