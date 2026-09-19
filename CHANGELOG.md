@@ -2,6 +2,17 @@
 
 # SpringLens Changelog
 
+## [1.2.2] - 2026-09-19
+
+### Changed
+- **Endpoint-Aware Gateway Selection:** The Direct Services/API Gateway selector now evaluates the selected endpoint against Gateway route targets and `Path` predicates, rather than treating every endpoint in a Gateway project as externally routable.
+- **Stable Internal API Controls:** Internal APIs retain the connection selector to prevent layout movement, but expose only **Direct Services**. Public APIs continue to offer both **Direct Services** and **API Gateway**.
+
+### Fixed
+- **Internal API Gateway Fallback:** Endpoints without a matching Gateway route no longer receive a guessed Gateway URL and are always sent directly to their owning service.
+- **Context-Path Gateway Matching:** Gateway route matching now combines a service `context-path` with its controller endpoint path, correctly recognizing routes such as `/post/**` for a service served at `/post`.
+- **Gateway Route Transform Resolution:** Route matching and URL generation now consistently account for `StripPrefix`, `PrefixPath`, and supported `RewritePath` configurations.
+
 ## [1.2.1] - 2026-09-18
 
 ### Changed

@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.2.1</version>
+    <version>1.2.2</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
@@ -39,6 +39,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.2.2 — Endpoint-Aware Gateway Routing</h3>
+        <ul>
+            <li><b>Internal API Protection:</b> Endpoints without a matching Gateway route now remain direct-only and no longer receive guessed Gateway URLs.</li>
+            <li><b>Stable Connection Selector:</b> Internal APIs keep the connection selector visible with Direct Services as the only option, preventing layout shifts while navigating endpoints.</li>
+            <li><b>Context-Path Route Matching:</b> Gateway routing now matches service context paths together with controller paths and consistently resolves <code>StripPrefix</code>, <code>PrefixPath</code>, and supported <code>RewritePath</code> rules.</li>
+        </ul>
         <h3>1.2.1 — Request URL & Parameter Handling</h3>
         <ul>
             <li><b>Live Query URL Synchronization:</b> Enabled query parameters with values now appear in the request URL with safe encoding, correct separators, and no duplicate entries.</li>
