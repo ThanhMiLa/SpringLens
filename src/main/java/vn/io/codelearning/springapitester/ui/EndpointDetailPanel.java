@@ -677,8 +677,7 @@ public class EndpointDetailPanel extends JPanel {
             updateMethodComboColor(method);
 
             String fullUrl = getEffectiveUrl(endpoint);
-            String resolvedUrl = vn.io.codelearning.springapitester.client.PathVariableUrlResolver
-                    .resolvePathVariables(fullUrl, endpoint.getParameters());
+            String resolvedUrl = PathVariableUrlResolver.resolvePathVariables(fullUrl, endpoint.getParameters());
             urlField.setText(QueryParameterUrlBuilder.applyQueryParameters(resolvedUrl, endpoint.getParameters()));
 
             urlField.setToolTipText(serverConfigTooltip(endpoint));
@@ -801,8 +800,7 @@ public class EndpointDetailPanel extends JPanel {
 
         java.util.List<ParameterModel> parameters = paramPanel.getParameters();
         String urlTemplate = getEffectiveUrl(currentEndpoint);
-        String resolvedUrl = vn.io.codelearning.springapitester.client.PathVariableUrlResolver
-                .resolvePathVariables(urlTemplate, parameters);
+        String resolvedUrl = PathVariableUrlResolver.resolvePathVariables(urlTemplate, parameters);
         String previewUrl = QueryParameterUrlBuilder.applyQueryParameters(resolvedUrl, parameters);
         if (previewUrl.equals(urlField.getText())) {
             return;
@@ -884,8 +882,7 @@ public class EndpointDetailPanel extends JPanel {
 
         EndpointModel requestEndpoint = currentEndpoint;
         String fullUrl = getEffectiveUrl(requestEndpoint);
-        String testUrl = vn.io.codelearning.springapitester.client.PathVariableUrlResolver
-                .resolvePathVariables(fullUrl, requestEndpoint.getParameters());
+        String testUrl = PathVariableUrlResolver.resolvePathVariables(fullUrl, requestEndpoint.getParameters());
 
         if (vn.io.codelearning.springapitester.scanner.SpringUrlUtils.hasUnresolvedPathVariables(testUrl)) {
             String missing = String.join(", ",
