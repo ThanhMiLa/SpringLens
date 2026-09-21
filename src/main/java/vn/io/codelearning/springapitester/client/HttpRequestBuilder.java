@@ -24,7 +24,7 @@ public class HttpRequestBuilder {
     public static ResolvedRequest resolveRequest(EndpointModel endpoint, String fullUrlPattern) {
         String urlPath = fullUrlPattern;
 
-        // 1. Thay thế Path Variables
+        // 1. Validate and replace Path Variables
         for (ParameterModel param : endpoint.getParameters()) {
             if (param.getParamType() == ParamTypeEnum.PATH_VARIABLE) {
                 String value = RequestValidationUtil.resolveParamValue(param);
@@ -32,11 +32,9 @@ public class HttpRequestBuilder {
                 if (param.isRequired() && value.trim().isEmpty() && placeholderPresent) {
                     throw new IllegalArgumentException("Missing required path variable: " + param.getName());
                 }
-                if (!value.trim().isEmpty()) {
-                    urlPath = SpringUrlUtils.replacePathVariable(urlPath, param.getName(), value);
-                }
             }
         }
+        urlPath = PathVariableUrlResolver.resolvePathVariables(urlPath, endpoint.getParameters());
 
         // 2. Validate and apply Query Params (?key=value)
         for (ParameterModel param : endpoint.getParameters()) {
