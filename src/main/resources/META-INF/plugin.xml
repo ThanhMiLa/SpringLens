@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.2.2</version>
+    <version>1.2.3</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
@@ -39,6 +39,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.2.3 — Live Path Variable URL Preview</h3>
+        <ul>
+            <li><b>Live Path Variable Resolution:</b> Values entered in Params now immediately replace matching Path Variable placeholders in the request URL preview.</li>
+            <li><b>Reliable Path Variable Updates:</b> The preview is rebuilt from the saved URL template, so changing a value multiple times remains accurate while preserving the original endpoint template.</li>
+        </ul>
         <h3>1.2.2 — Endpoint-Aware Gateway Routing</h3>
         <ul>
             <li><b>Internal API Protection:</b> Endpoints without a matching Gateway route now remain direct-only and no longer receive guessed Gateway URLs.</li>

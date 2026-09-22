@@ -2,6 +2,11 @@
 
 # SpringLens Changelog
 
+## [1.2.3] - 2026-09-22
+
+### Fixed
+- **Live Path Variable URL Preview:** Values entered in the Params table now immediately replace matching Path Variable placeholders in the request URL preview. The preview is rebuilt from the endpoint URL template, so repeated edits remain accurate without overwriting the saved template or hiding its parameter row.
+
 ## [1.2.2] - 2026-09-19
 
 ### Changed
