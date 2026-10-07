@@ -1,5 +1,7 @@
 package vn.io.codelearning.springapitester.scanner;
 
+import com.intellij.execution.RunManagerListener;
+import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -51,6 +53,7 @@ public class SpringConfigResolutionService implements Disposable {
     public SpringConfigResolutionService(@NotNull Project project) {
         this.project = project;
         registerVfsListener();
+        registerRunConfigurationListener();
     }
 
     public static SpringConfigResolutionService getInstance(@NotNull Project project) {
@@ -62,7 +65,7 @@ public class SpringConfigResolutionService implements Disposable {
             boolean hasConfigChange = false;
             for (VFileEvent event : events) {
                 VirtualFile file = event.getFile();
-                if (file != null && isConfigFile(file.getName())) {
+                if (file != null && (isConfigFile(file.getName()) || "java".equals(file.getExtension()))) {
                     hasConfigChange = true;
                     break;
                 }
@@ -83,6 +86,30 @@ public class SpringConfigResolutionService implements Disposable {
         cacheGeneration.incrementAndGet();
         serverConfigCache.clear();
         gatewayConfigCache.clear();
+    }
+
+    private void registerRunConfigurationListener() {
+        project.getMessageBus().connect(this).subscribe(RunManagerListener.TOPIC, new RunManagerListener() {
+            @Override
+            public void runConfigurationSelected(@Nullable RunnerAndConfigurationSettings settings) {
+                invalidateCache();
+            }
+
+            @Override
+            public void runConfigurationAdded(@NotNull RunnerAndConfigurationSettings settings) {
+                invalidateCache();
+            }
+
+            @Override
+            public void runConfigurationRemoved(@NotNull RunnerAndConfigurationSettings settings) {
+                invalidateCache();
+            }
+
+            @Override
+            public void runConfigurationChanged(@NotNull RunnerAndConfigurationSettings settings) {
+                invalidateCache();
+            }
+        });
     }
 
     @Override
@@ -177,18 +204,8 @@ public class SpringConfigResolutionService implements Disposable {
         }
 
         Map<String, String> accumulatedProps = new LinkedHashMap<>();
-        String activeProfile = "";
-
-        // First pass: detect active profile
-        for (VirtualFile vf : candidateFiles) {
-            Map<String, String> rawProps = loadPropertiesFromFile(vf);
-            String profile = rawProps.get("spring.profiles.active");
-            if (profile != null && !profile.isBlank()) {
-                activeProfile = profile.trim();
-                config.setActiveProfile(activeProfile);
-                break;
-            }
-        }
+        String activeProfile = findEffectiveProfile(candidateFiles, targetModule, config.getDiagnostics());
+        config.setActiveProfile(activeProfile);
 
         // Second pass: apply base then active profile configs with import resolution
         Set<String> visitedFiles = new HashSet<>();
@@ -298,16 +315,7 @@ public class SpringConfigResolutionService implements Disposable {
         }
 
         Map<String, String> accumulatedProps = new LinkedHashMap<>();
-        String activeProfile = "";
-
-        for (VirtualFile vf : candidateFiles) {
-            Map<String, String> rawProps = loadPropertiesFromFile(vf);
-            String profile = rawProps.get("spring.profiles.active");
-            if (profile != null && !profile.isBlank()) {
-                activeProfile = profile.trim();
-                break;
-            }
-        }
+        String activeProfile = findEffectiveProfile(candidateFiles, gatewayModule, config.diagnostics);
 
         Set<String> visitedFiles = new HashSet<>();
         Yaml yaml = new Yaml();
@@ -351,60 +359,73 @@ public class SpringConfigResolutionService implements Disposable {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    private String findEffectiveProfile(List<VirtualFile> candidateFiles, @Nullable Module module, List<String> diagnostics) {
+        Map<String, String> profiles = new LinkedHashMap<>(SpringApplicationProfileReader.readDefaultProfiles(project, module));
+        Map<String, String> fileProfiles = new LinkedHashMap<>();
+        for (VirtualFile file : candidateFiles) {
+            Map<String, String> properties = loadPropertiesFromFile(file);
+            for (String key : List.of("spring.profiles.active", "spring.profiles.default")) {
+                String value = properties.get(key);
+                if (value != null && !value.isBlank()) fileProfiles.putIfAbsent(key, value.trim());
+            }
+        }
+        profiles.putAll(fileProfiles);
+        profiles.putAll(RunConfigurationProfileReader.readProfiles(project, module, diagnostics));
+        String activeProfile = profiles.get("spring.profiles.active");
+        return activeProfile != null && !activeProfile.isBlank()
+                ? activeProfile : profiles.getOrDefault("spring.profiles.default", "");
+    }
+
     private void parseGatewayYamlDocument(Map<String, Object> doc, GatewayConfig config, Map<String, String> props) {
-        // Port
         Object serverObj = doc.get("server");
-        if (serverObj instanceof Map) {
-            Map<String, Object> serverMap = (Map<String, Object>) serverObj;
+        if (serverObj instanceof Map<?, ?> serverMap) {
             Object portObj = serverMap.get("port");
             if (portObj != null) {
                 config.port = resolvePlaceholders(String.valueOf(portObj), props, config.diagnostics);
             }
         }
 
-        // Spring -> Cloud -> Gateway
         Object springObj = doc.get("spring");
-        if (springObj instanceof Map) {
-            Map<String, Object> springMap = (Map<String, Object>) springObj;
+        if (springObj instanceof Map<?, ?> springMap) {
             Object cloudObj = springMap.get("cloud");
-            if (cloudObj instanceof Map) {
-                Map<String, Object> cloudMap = (Map<String, Object>) cloudObj;
+            if (cloudObj instanceof Map<?, ?> cloudMap) {
                 Object gatewayObj = cloudMap.get("gateway");
-                if (gatewayObj instanceof Map) {
-                    Map<String, Object> gatewayMap = (Map<String, Object>) gatewayObj;
-
-                    // Discovery locator
-                    Object discoveryObj = gatewayMap.get("discovery");
-                    if (discoveryObj instanceof Map) {
-                        Map<String, Object> discMap = (Map<String, Object>) discoveryObj;
-                        Object locatorObj = discMap.get("locator");
-                        if (locatorObj instanceof Map) {
-                            Map<String, Object> locMap = (Map<String, Object>) locatorObj;
-                            if (Boolean.TRUE.equals(locMap.get("enabled")) || "true".equals(String.valueOf(locMap.get("enabled")))) {
-                                config.discoveryLocatorEnabled = true;
-                            }
+                if (gatewayObj instanceof Map<?, ?> gatewayMap) {
+                    parseGatewaySettings(gatewayMap, config);
+                    Object gatewayServerObj = gatewayMap.get("server");
+                    if (gatewayServerObj instanceof Map<?, ?> gatewayServerMap) {
+                        Object webfluxObj = gatewayServerMap.get("webflux");
+                        if (webfluxObj instanceof Map<?, ?> webfluxMap) {
+                            parseGatewaySettings(webfluxMap, config);
                         }
                     }
+                }
+            }
+        }
+    }
 
-                    // Routes
-                    Object routesObj = gatewayMap.get("routes");
-                    if (routesObj instanceof List) {
-                        List<Object> routesList = (List<Object>) routesObj;
-                        for (Object rItem : routesList) {
-                            if (rItem instanceof Map) {
-                                Map<String, Object> routeMap = (Map<String, Object>) rItem;
-                                GatewayRouteModel route = new GatewayRouteModel();
-                                if (routeMap.containsKey("id")) route.setId(String.valueOf(routeMap.get("id")));
-                                if (routeMap.containsKey("uri")) route.setUri(String.valueOf(routeMap.get("uri")));
+    private void parseGatewaySettings(Map<?, ?> gatewayMap, GatewayConfig config) {
+        Object discoveryObj = gatewayMap.get("discovery");
+        if (discoveryObj instanceof Map<?, ?> discoveryMap) {
+            Object locatorObj = discoveryMap.get("locator");
+            if (locatorObj instanceof Map<?, ?> locatorMap) {
+                if (Boolean.TRUE.equals(locatorMap.get("enabled")) || "true".equals(String.valueOf(locatorMap.get("enabled")))) {
+                    config.discoveryLocatorEnabled = true;
+                }
+            }
+        }
 
-                                parseRoutePredicates(routeMap.get("predicates"), route);
-                                parseRouteFilters(routeMap.get("filters"), route);
+        Object routesObj = gatewayMap.get("routes");
+        if (routesObj instanceof List<?> routesList) {
+            for (Object routeObj : routesList) {
+                if (routeObj instanceof Map<?, ?> routeMap) {
+                    GatewayRouteModel route = new GatewayRouteModel();
+                    if (routeMap.containsKey("id")) route.setId(String.valueOf(routeMap.get("id")));
+                    if (routeMap.containsKey("uri")) route.setUri(String.valueOf(routeMap.get("uri")));
 
-                                mergeRoute(config.routes, route);
-                            }
-                        }
-                    }
+                    parseRoutePredicates(routeMap.get("predicates"), route);
+                    parseRouteFilters(routeMap.get("filters"), route);
+                    mergeRoute(config.routes, route);
                 }
             }
         }

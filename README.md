@@ -28,12 +28,16 @@ SpringLens automatically scans your project to organize all endpoints into an in
 |---|---|
 | **Deep AST/PSI Endpoint Scanner** | Scans `@RestController`, `@GetMapping`, `@PostMapping`... across all modules with full `@PathVariable` regex and `@RequestPart` Multipart support. |
 | **Instant DTO Schema Sync** | One-click JSON body generator from Java DTO classes with recursive reference protection and smart merge. |
-| **Spring Cloud Gateway Ready** | Auto-detects Gateway routes, computes reverse rewrites (`StripPrefix`, `PrefixPath`, `RewritePath`), and keeps internal endpoints direct-only when no Gateway route exposes them. |
+| **Spring Cloud Gateway Ready** | Reads YAML routes under `spring.cloud.gateway.routes` and `spring.cloud.gateway.server.webflux.routes`, honors `spring.profiles.default` when no active profile is configured, computes reverse rewrites (`StripPrefix`, `PrefixPath`, `RewritePath`), and keeps internal endpoints direct-only when no Gateway route exposes them. |
 | **One-Click Bearer Token Sharing** | Set your Bearer JWT Token once and sync it across all project endpoints in a single click with **"Apply to All APIs"**. |
 | **Custom Endpoints & Collections** | Create manual endpoints and custom folders to test external APIs, third-party webhooks, or ad-hoc requests alongside scanned project endpoints. |
 | **Dev-Friendly SSL** | Built-in Trust-All SSL handler for local microservices running on self-signed `https://localhost` certificates without handshake failures. |
 | **Workspace State Persistence** | Preserves all custom headers, parameters, and request bodies per-project across IDE restarts. |
 | **Instant cURL Export** | One-click copy for ready-to-run `curl` commands for terminal testing and team collaboration. |
+
+Profile detection also reads constant `spring.profiles.active` and `spring.profiles.default` values passed directly through `SpringApplication.setDefaultProperties(Map.of(...))` in a Java `@SpringBootApplication` main method. File configuration takes precedence for the same property; dynamically computed Java configuration is not evaluated.
+
+For IntelliJ Spring Boot and Application run configurations, profile detection reads the Active profiles field, explicit profile environment variables, VM options, and program arguments. The selected configuration is used for its module; other modules use their sole matching configuration. If a module has multiple configurations, select the desired one and click **Reload**. Saved Spring Boot configurations can also be read in a sandbox where IntelliJ's Spring Boot plugin is unavailable.
 
 
 ## Screenshots

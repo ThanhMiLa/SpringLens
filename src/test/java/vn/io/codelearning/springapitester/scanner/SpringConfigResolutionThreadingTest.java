@@ -33,4 +33,28 @@ public class SpringConfigResolutionThreadingTest extends BasePlatformTestCase {
 
         assertEquals(9091, config.getPort());
     }
+
+    public void testServerConfigUsesDefaultProfile() throws Exception {
+        myFixture.addFileToProject("src/main/resources/application.yaml", """
+                spring:
+                  profiles:
+                    default: dev
+                """);
+        myFixture.addFileToProject("src/main/resources/application-dev.yaml", """
+                server:
+                  port: 9091
+                  servlet:
+                    context-path: /user
+                """);
+        SpringConfigResolutionService service = SpringConfigResolutionService.getInstance(getProject());
+        service.invalidateCache();
+
+        SpringServerConfig config = ApplicationManager.getApplication().executeOnPooledThread(
+                (Callable<SpringServerConfig>) service::resolveServerConfig
+        ).get();
+
+        assertEquals(9091, config.getPort());
+        assertEquals("/user", config.getContextPath());
+        assertEquals("dev", config.getActiveProfile());
+    }
 }
