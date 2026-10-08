@@ -2,6 +2,14 @@
 
 # SpringLens Changelog
 
+## [1.2.4] - 2026-10-08
+
+### Fixed
+- **IntelliJ Run Configuration Profiles:** Resolve active and default profiles from Spring Boot and Application run configurations, including the Active profiles field, explicit environment variables, VM options, and program arguments. Match configurations to their owning modules and read saved Spring Boot configurations even when IntelliJ's Spring Boot plugin is unavailable.
+- **Default Profile Configuration:** Honor `spring.profiles.default` in configuration files and constant profile values passed through `SpringApplication.setDefaultProperties(Map.of(...))` in Java application main methods, so the corresponding profile files supply service ports and Gateway routes.
+- **WebFlux Gateway Configuration:** Read routes and discovery locator settings under `spring.cloud.gateway.server.webflux` while retaining support for the legacy Gateway configuration structure.
+- **Profile Cache Refresh:** Invalidate resolved configuration when run configurations are added, edited, removed, or selected, and when Java source files change.
+
 ## [1.2.3] - 2026-09-22
 
 ### Fixed

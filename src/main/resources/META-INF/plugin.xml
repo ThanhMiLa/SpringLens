@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.thanhmila.plugin.springlens</id>
     <name>SpringLens - Spring Boot RESTful API Tester</name>
-    <version>1.2.3</version>
+    <version>1.2.4</version>
     <vendor email="vntvlogs@gmail.com" url="https://github.com/ThanhMiLa/SpringLens">ThanhMiLa</vendor>
 
     <description><![CDATA[
@@ -39,6 +39,13 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.2.4 — Application Profiles &amp; Gateway Configuration</h3>
+        <ul>
+            <li><b>IntelliJ Run Profiles:</b> Read profiles from module-specific Spring Boot and Application run configurations, including saved Spring Boot configurations in sandboxes without IntelliJ's Spring Boot plugin.</li>
+            <li><b>Default Profile Detection:</b> Honor <code>spring.profiles.default</code> in configuration files and constant profile values supplied through <code>SpringApplication.setDefaultProperties(Map.of(...))</code> in Java main methods.</li>
+            <li><b>WebFlux Gateway Routes:</b> Read routes and discovery locator settings under <code>spring.cloud.gateway.server.webflux</code> while preserving support for the legacy configuration structure.</li>
+            <li><b>Configuration Cache Refresh:</b> Invalidate cached configuration when run settings, the selected run configuration, or Java source files change.</li>
+        </ul>
         <h3>1.2.3 — Live Path Variable URL Preview</h3>
         <ul>
             <li><b>Live Path Variable Resolution:</b> Values entered in Params now immediately replace matching Path Variable placeholders in the request URL preview.</li>
